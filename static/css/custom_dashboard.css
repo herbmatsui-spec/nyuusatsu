@@ -1,0 +1,17 @@
+/* Custom dashboard theme */
+body {
+    background-color: #f9fafb;
+    color: #111827;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #1e3a8a;
+    font-weight: 600;
+}
+
+.stMetric {
+    background-color: #e0e7ff;
+    border-radius: 4px;
+    padding: 8px;
+}

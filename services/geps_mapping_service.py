@@ -15,7 +15,7 @@ class GEPSMappingService:
         self.session = session
 
     def get_or_create_category(self, category_name: str) -> AgencyCategory:
-        \"\"\"カテゴリ名からカテゴリIDを取得、なければ作成する\"\"\"
+        """カテゴリ名からカテゴリIDを取得、なければ作成する"""
         category = self.session.query(AgencyCategory).filter_by(name=category_name).first()
         if not category:
             logger.info(f"Creating new category: {category_name}")
@@ -25,10 +25,10 @@ class GEPSMappingService:
         return category
 
     def map_crawl_result_to_agency(self, result: CrawlResult) -> Agency:
-        \"\"\"
+        """
         CrawlResultをAgencyモデルに変換して保存する。
         GEPSの場合、categoryは'国'として扱う。
-        \"\"\"
+        """
         agency_name = result.agency_name or "GEPS"
         
         # 既存の機関があるか確認
@@ -53,9 +53,9 @@ class GEPSMappingService:
         return agency
 
     def process_geps_results(self, results: List[CrawlResult]):
-        \"\"\"
+        """
         GEPSの結果リストを処理し、機関をDBに登録する。
-        \"\"\"
+        """
         processed_count = 0
         for result in results:
             try:

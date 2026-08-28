@@ -11,6 +11,7 @@ from utils.session_manager import get_session_manager
 from utils.ui import inject_custom_css
 from database.session import get_db
 from database.models.alert_history import AlertHistory
+from database.models.qa_review import QAReview, QAStatusEnum
 from services.metrics_query_service import MetricsQueryService
 from services.health_checker import HealthChecker
 
@@ -92,7 +93,7 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # Main Dashboard Sections
 # -----------------------------------------------------------------------------
-tab1, tab2, tab3 = st.tabs(["📊 パイプライン監視", "📝 構造化ログビューア", "🚨 アラート履歴"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 パイプライン監視", "📝 構造化ログビューア", "🚨 アラート履歴", "🛠 QA 進捗"])
 
 with tab1:
     # 1. 統合ヘルスステータス
@@ -197,7 +198,7 @@ with tab2:
                     if trace_id_search and trace_id_search not in log_data.get("trace_id", ""):
                         continue
                     logs_list.append(log_data)
-                except:
+                except (json.JSONDecodeError, ValueError):
                     # 非構造化テキストログの場合
                     if not level_filter and not stage_filter and not trace_id_search:
                         logs_list.append({"message": line.strip()})
@@ -236,3 +237,17 @@ with tab3:
         st.dataframe(df_alerts.style.apply(highlight_unresolved, axis=1), use_container_width=True)
     else:
         st.info("現在アラート履歴はありません。システムは安定稼働しています。")
+        # QA 進捗タブ
+        with tab4:
+            st.subheader("🛠 QA 進捗")
+            with get_db() as qa_session:
+                pending = qa_session.query(QAReview).filter(QAReview.status == QAStatusEnum.PENDING).count()
+                reviewing = qa_session.query(QAReview).filter(QAReview.status == QAStatusEnum.REVIEWING).count()
+                approved = qa_session.query(QAReview).filter(QAReview.status == QAStatusEnum.APPROVED).count()
+                rejected = qa_session.query(QAReview).filter(QAReview.status == QAStatusEnum.REJECTED).count()
+                data = {
+                    "ステータス": ["保留", "レビュー中", "承認", "却下"],
+                    "件数": [pending, reviewing, approved, rejected]
+                }
+                df = pd.DataFrame(data)
+                st.table(df)

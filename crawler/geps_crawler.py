@@ -7,15 +7,17 @@ from urllib.parse import urljoin, urlparse
 
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
+from crawler.base_crawler import BaseCrawler
 
 logger = logging.getLogger(__name__)
 
-class GEPSCrawler:
+class GEPSCrawler(BaseCrawler):
     """政府調達ポータル（GEPS）用クローラー"""
     
     BASE_URL = "https://www.geps.go.jp"
     
     def __init__(self, delay: float = 5.0, timeout: int = 60000):
+        super().__init__(retry=3, timeout=timeout, backoff=0.5)
         self.delay = delay
         self.timeout = timeout
         self.playwright = None

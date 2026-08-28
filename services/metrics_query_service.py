@@ -111,7 +111,7 @@ class MetricsQueryService:
                 try:
                     labels = json.loads(row.labels) if row.labels else {}
                     error_type = labels.get("error", "UnknownError")
-                except:
+                except (json.JSONDecodeError, ValueError):
                     error_type = "UnknownError"
                 
                 key = (stage, error_type)

@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 from config import AppConfig
 
 def verify_env():
-    \"\"\"
+    """
     .env ファイルの内容が AppConfig で必要とする環境変数と整合しているか検証する。
-    \"\"\"
+    """
     load_dotenv()
     config = AppConfig()
     

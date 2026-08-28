@@ -195,7 +195,7 @@ class CrawlScheduler:
                     asyncio.set_event_loop(loop)
                     loop.run_until_complete(crawler.close())
                     loop.close()
-                except:
+                except Exception:
                     pass
         except Exception as e:
             errors.append(f"GEPS crawl failed: {str(e)}")
@@ -256,7 +256,7 @@ class CrawlScheduler:
                     asyncio.set_event_loop(loop)
                     loop.run_until_complete(crawler.close())
                     loop.close()
-                except:
+                except Exception:
                     pass
         except Exception as e:
             errors.append(f"Web crawl failed: {str(e)}")

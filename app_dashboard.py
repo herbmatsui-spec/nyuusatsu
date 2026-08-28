@@ -32,7 +32,7 @@ st.set_page_config(
     page_icon="📊",
     layout="wide",
 )
-inject_custom_css()
+inject_custom_css("custom_dashboard.css")
 
 if "/welcome_dismissed" not in st.session_state:
     st.info("🏢 デモ環境です（ユーザーID=defaultで動作します）。右上の × で閉じられます。")
@@ -49,7 +49,7 @@ with st.sidebar:
     st.header("📋 メニュー")
     menu = st.radio(
         "表示する画面を選択",
-        ["📊 概要", "📈 分析", "🔍 検索", "⭐ お気に入り", "🕒 履歴", "💰 コスト", "🔔 通知設定", "🏢 競合分析", "🔔 アラート履歴", "🏢 自社資格", "📄 仕様書アーカイブ", "📅 カレンダー", "🗂 カンバン", "💡 価格シミュレータ"],
+        ["📊 概要", "📈 分析", "🔍 検索", "⭐ お気に入り", "🕒 履歴", "💰 コスト", "🔔 通知設定", "🏢 競合分析", "🛠 データ品質", "🔔 アラート履歴", "🏢 自社資格", "📄 仕様書アーカイブ", "📅 カレンダー", "🗂 カンバン", "💡 価格シミュレータ"],
         key="menu_selection"
     )
     st.caption("📊 概要: KPIと分布  /  📈 分析: 市場落札率  /  🔍 検索: 案件一覧  /  ⭐ お気に入り  /  🕒 履歴  /  💰 コスト  /  🔔 通知")
@@ -288,6 +288,33 @@ elif menu == "🔔 アラート履歴":
 elif menu == "🏢 競合分析":
     from services.competitor_dashboard_page import render_competitor_page
     render_competitor_page()
+elif menu == "🛠 データ品質":
+    st.title("🛠 データ品質")
+    st.subheader("落札結果データの品質チェック")
+    from services.award_quality_checker import get_quality_report
+    with get_session() as session:
+        report = get_quality_report(session)
+    import pandas as pd
+    cols = st.columns(4)
+    cols[0].metric("総落札件数", f"{report.get('total_awards', 0)}")
+    cols[1].metric("欠損落札率", f"{report.get('missing_award_rate', 0)} 件")
+    cols[2].metric("欠損予算", f"{report.get('missing_budget', 0)} 件")
+    cols[3].metric("欠損落札者", f"{report.get('missing_winner', 0)} 件")
+    # 重複URL
+    if report.get('duplicate_source_urls'):
+        st.subheader("重複URL")
+        df_dup = pd.DataFrame(report['details']['duplicates'])
+        st.dataframe(df_dup)
+    # 欠損例表示
+    if report['details'].get('missing_award_rate'):
+        st.subheader("落札率欠損例")
+        st.dataframe(pd.DataFrame(report['details']['missing_award_rate']))
+    if report['details'].get('missing_budget'):
+        st.subheader("予算欠損例")
+        st.dataframe(pd.DataFrame(report['details']['missing_budget']))
+    if report['details'].get('missing_winner'):
+        st.subheader("落札者欠損例")
+        st.dataframe(pd.DataFrame(report['details']['missing_winner']))
 elif menu == "🏢 自社資格":
     from services.company_profile_page import render_company_profile_page
     render_company_profile_page()

@@ -11,6 +11,7 @@ from database.repositories.notification_channel_repository import NotificationCh
 logger = logging.getLogger(__name__)
 
 class NotificationService:
+    """Unified notification service for various channels."""
     def __init__(self, crawl_service: CrawlService):
         self.crawl_service = crawl_service
         self.config = AppConfig()
@@ -78,6 +79,18 @@ class NotificationService:
             logger.info(f"Email notification sent to {to_email}.")
         except Exception as e:
             logger.error(f"Failed to send email notification: {e}")
+
+    def send_competitor_alert(self, message: str):
+        """Send competitor alert via configured notification channels."""
+        if not self.enabled:
+            return
+        # Send via Slack and LINE (if enabled)
+        self.send_slack_notification(message)
+        self.send_line_notification(message)
+        # Optionally send email to admin if configured
+        admin_email = self._get_setting("admin_email", "")
+        if admin_email:
+            self.send_email_notification("競合アラート", message, admin_email)
 
     def get_active_channels(self, user_id: str):
         repo = NotificationChannelRepository(self.crawl_service.session)

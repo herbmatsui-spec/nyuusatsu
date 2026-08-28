@@ -40,7 +40,7 @@ def execute_crawl():
         try:
             crawl_service = CrawlService(session)
             crawl_service.record_crawl_history(url_count=0, new_count=0, status="FAILED", error_message=str(e))
-        except:
+        except Exception:
             pass
         return {"success": False, "error": str(e)}
     finally:

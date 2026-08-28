@@ -1,0 +1,45 @@
+"""Generated ORM models. See _generated.py (source of truth: bids_system.db / bids.db)."""
+from ._generated import Base
+from ._generated import Agency as Agency
+from ._generated import AgencyCategory as AgencyCategory
+from ._generated import CrawlConfig as CrawlConfig
+from ._generated import AlertHistory as AlertHistory
+from ._generated import Competitor as Competitor
+from ._generated import AwardResult as AwardResult
+from ._generated import AwardHistory as AwardHistory
+from ._generated import Bid as Bid
+from ._generated import BidQualificationTag as BidQualificationTag
+from ._generated import QualificationTag as QualificationTag
+from ._generated import CompanyProfile as CompanyProfile
+from ._generated import CompanyRegionRank as CompanyRegionRank
+from ._generated import Customer as Customer
+from ._generated import Partner as Partner
+from ._generated import CustomerBidLink as CustomerBidLink
+from ._generated import PartnerBidLink as PartnerBidLink
+from ._generated import BidStatus as BidStatus
+from ._generated import Prefecture as Prefecture
+from ._generated import BidSource as BidSource
+from ._generated import Setting as SystemSetting
+from ._generated import CrawlHistory as CrawlHistory
+from ._generated import CrawledUrl as CrawledUrl
+from ._generated import CrawlLog as CrawlLog
+from ._generated import AuditLog as AuditLog
+from ._generated import DocumentArchive as DocumentArchive
+from ._generated import ExtractionResult as ExtractionResult
+from ._generated import ForecastStatus as ForecastStatusEnum
+from ._generated import ForecastStatus as ForecastStatus
+from ._generated import ProcurementForecast as ProcurementForecast
+from ._generated import Role as Role
+from ._generated import UserRole as UserRole
+from ._generated import SavedSearch as SavedSearch
+from ._generated import UrlRegistry
+from ._generated import UrlRegistry as URLRegistry
+from ._generated import User as User
+from ._generated import Organization as Organization
+from ._generated import PdfDocument as PDFDocument
+from ._generated import PipelineMetric as PipelineMetric
+from ._generated import PipelineRun as PipelineRun
+from ._generated import BidAssignment as BidAssignment
+from ._generated import NotificationChannel as NotificationChannel
+from ._generated import Favorite as Favorite
+from ._generated import CompetitorAlertConfig as ForecastAlertConfig

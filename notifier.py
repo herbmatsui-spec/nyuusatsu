@@ -74,6 +74,36 @@ def create_notification_service(notify_type: str) -> NotificationService:
         raise ValueError(f"Unsupported notification type: {notify_type}")
 
 def format_new_bid_message(bids: list) -> str:
+    """新着入札案件の一覧を通知用テキストに整形する。"""
+    if not bids:
+        return "新着の入札案件はありません。"
+    lines = ["【新着入札案件】"]
+    for bid in bids:
+        name = getattr(bid, "project_name", None) or bid.get("project_name", "") if isinstance(bid, dict) else str(bid)
+        org = getattr(bid, "organization", None) or (bid.get("organization", "") if isinstance(bid, dict) else "")
+        budget = getattr(bid, "budget", None) or (bid.get("budget", "") if isinstance(bid, dict) else "")
+        line = f"- {name}"
+        if org:
+            line += f"（{org}）"
+        if budget:
+            line += f" 予算: {budget}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def notify_quality_issue(metric_name: str, value: float, level: str = "warn") -> bool:
+    """品質メトリクスの警告またはアラートを通知する。
+    level: "warn" (警告) または "alert" (重大)"""
+    message = f"⚠️ 【品質{'警告' if level == 'warn' else 'アラート'}】\nメトリクス: {metric_name}\n値: {value}"
+    # Slack が設定されていれば優先的に利用、次に LINE
+    for notify_type in ("slack", "line"):
+        try:
+            service = create_notification_service(notify_type)
+            if service.send(message):
+                return True
+        except Exception as e:
+            logging.error(f"{notify_type} 通知失敗: {e}")
+    return False
     """Formats a list of new bids into a readable message
     """
     if not bids:
