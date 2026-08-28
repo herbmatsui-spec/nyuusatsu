@@ -1,0 +1,6 @@
+apscheduler
+Flask
+requests
+beautifulsoup4
+python-dotenv
+sqlite-utils

@@ -1,0 +1,34 @@
+{
+    "松山市": {
+        "enabled": true,
+        "url_includes": ["/shisei/shiseijoho/nyusatsu/"],
+        "title_keywords": ["入札", "公告", "仕様書"],
+        "css_selectors": [
+            "a[href*='pdf']",
+            ".nyusatsu-list a"
+        ],
+        "requires_login": false,
+        "dynamic_strategy": "network_idle"
+    },
+    "今治市": {
+        "enabled": true,
+        "url_includes": ["/soshiki/somusho/nyusatsu/"],
+        "title_keywords": ["入札", "公告"],
+        "css_selectors": [
+            "a[href*='pdf']",
+            "td a"
+        ],
+        "requires_login": false,
+        "dynamic_strategy": "network_idle"
+    },
+    "宇和島市": {
+        "enabled": true,
+        "url_includes": ["/shisei/nyusatsu/"],
+        "title_keywords": ["入札", "公告"],
+        "css_selectors": [
+            "a[href*='pdf']"
+        ],
+        "requires_login": false,
+        "dynamic_strategy": "network_idle"
+    }
+}

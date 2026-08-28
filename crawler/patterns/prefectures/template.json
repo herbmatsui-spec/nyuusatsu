@@ -1,0 +1,21 @@
+{
+  "common_patterns": {
+    "default_title_keywords": ["入札", "公告", "調達", "競争"],
+    "default_css_selectors": ["a[href*='pdf']", "a[href*='doc']"],
+    "default_link_keywords": ["nyusatsu", "sougou", "hendou", "ippann", "oshirase", "koukoku"],
+    "default_dynamic_strategy": "network_idle",
+    "default_max_depth": 2
+  },
+  "prefectures": {
+    "愛媛県": {
+      "entry_url": "https://www.pref.ehime.jp/site/nyusatsu/",
+      "url_includes": ["/site/nyusatsu/"],
+      "notes": "県庁"
+    },
+    "北海道": {
+      "entry_url": "https://www.pref.hokkaido.lg.jp/ks/pps/index.html",
+      "url_includes": ["/ks/pps/"],
+      "notes": "北海道庁"
+    }
+  }
+}

@@ -1,0 +1,529 @@
+{
+  "愛媛県": {
+    "enabled": true,
+    "entry_url": "https://www.pref.ehime.jp/site/nyusatsu/",
+    "url_includes": [
+      "/site/nyusatsu/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告",
+      "調達"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "県庁",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "松山市": {
+    "enabled": true,
+    "entry_url": "https://www.city.matsuyama.ehime.jp/shisei/denshinyusatsu/jouhou/",
+    "url_includes": [
+      "/shisei/denshinyusatsu/jouhou/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告",
+      "競争"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "県都",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "今治市": {
+    "enabled": true,
+    "entry_url": "https://www.city.imabari.ehime.jp/kouhou/koukoku/",
+    "url_includes": [
+      "/kouhou/koukoku/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "宇和島市": {
+    "enabled": true,
+    "entry_url": "https://www.city.uwajima.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "八幡浜市": {
+    "enabled": true,
+    "entry_url": "https://www.city.yawatahama.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "新居浜市": {
+    "enabled": true,
+    "entry_url": "https://www.city.niihama.lg.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "西条市": {
+    "enabled": true,
+    "entry_url": "https://www.city.saijo.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "大洲市": {
+    "enabled": true,
+    "entry_url": "https://www.city.ozu.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "伊予市": {
+    "enabled": true,
+    "entry_url": "https://www.city.iyo.lg.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "四国中央市": {
+    "enabled": true,
+    "entry_url": "https://www.city.shikokuchuo.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "西予市": {
+    "enabled": true,
+    "entry_url": "https://www.city.seiyo.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "東温市": {
+    "enabled": true,
+    "entry_url": "https://www.city.toon.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県上島町": {
+    "enabled": true,
+    "entry_url": "https://www.town.kamijima.lg.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県久万高原町": {
+    "enabled": true,
+    "entry_url": "https://www.kumakogen.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県松前町": {
+    "enabled": true,
+    "entry_url": "https://www.town.masaki.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県砥部町": {
+    "enabled": true,
+    "entry_url": "https://www.town.tobe.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県内子町": {
+    "enabled": true,
+    "entry_url": "https://www.town.uchiko.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県伊方町": {
+    "enabled": true,
+    "entry_url": "https://www.town.ikata.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県松野町": {
+    "enabled": true,
+    "entry_url": "https://www.town.matsuno.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県鬼北町": {
+    "enabled": true,
+    "entry_url": "https://www.town.kihoku.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  },
+  "愛媛県愛南町": {
+    "enabled": true,
+    "entry_url": "https://www.town.ainan.ehime.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "TOPから検索",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  }
+}

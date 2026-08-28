@@ -1,0 +1,6 @@
+version: 2
+dependabot:
+  package-ecosystem: "pip"
+  directory: "/"
+  schedule:
+    interval: "weekly"

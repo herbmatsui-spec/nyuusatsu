@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  streamlit:
+    build: .
+    ports:
+      - "8501:8501"
+    depends_on:
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    command: streamlit run app.py
+    
+  fastapi:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    command: uvicorn search_api.main:app --host 0.0.0.0 --port 8000
+    
+  admin:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    command: python app_admin.py
+
+  observability:
+    build: .
+    ports:
+      - "8502:8502"
+    depends_on:
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    command: streamlit run app_observability.py --server.port 8502
+
+  scheduler:
+    build: .
+    depends_on:
+      - redis
+      - streamlit
+      - fastapi
+    env_file:
+      - .env
+    command: python -c "from scheduler import scheduler_manager; scheduler_manager.start(); import time; time.sleep(31536000)"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:

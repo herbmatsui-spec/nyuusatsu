@@ -1,0 +1,26 @@
+# 固定バージョンロックファイル（自動生成）
+# 本番再現性のため、requirements.txt の代わりに本ファイルで
+# 完全に一致するバージョンをインストールできます。
+#   pip install -r requirements_lock.txt
+# 注意: scikit-learn はシステム環境に未インストールのため記載省略。
+
+streamlit==1.53.1
+plotly==6.7.0
+requests==2.32.5
+beautifulsoup4==4.15.0
+pdfplumber==0.11.10
+google-genai==2.10.0
+pydantic==2.12.5
+pandas==2.3.3
+python-dotenv==1.2.1
+playwright==1.61.0
+duckduckgo-search==8.1.1
+lxml==6.1.1
+sqlalchemy==2.0.50
+alembic==1.18.4
+psycopg2-binary==2.9.12
+pytesseract==0.3.13
+Pillow==12.3.0
+pdf2image==1.17.0
+azure-ai-documentintelligence==1.0.2
+numpy==2.4.1

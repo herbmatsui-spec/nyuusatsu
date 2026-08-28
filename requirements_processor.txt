@@ -1,0 +1,7 @@
+requests
+beautifulsoup4
+pdfplumber
+google-genai
+pydantic
+pandas
+python-dotenv

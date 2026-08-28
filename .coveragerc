@@ -1,0 +1,26 @@
+[run]
+source = 
+    crawler
+    geps_crawler.py
+    config.py
+    services
+omit = 
+    .venv/*
+    .venv_fixed/*
+    .venv_rq10/*
+    tests/*
+    database/connection.py
+    app.py
+    app_dashboard.py
+    app_admin.py
+    main.py
+    htmlcov/*
+    __pycache__/*
+    temp_*/*
+    alembic/*
+    migrations/*
+
+[report]
+show_missing = True
+skip_covered = True
+fail_under = 0

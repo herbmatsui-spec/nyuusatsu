@@ -1,0 +1,39 @@
+# Virtual environments
+.venv/
+.venv_fixed/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Secrets / local env
+.env
+.env.*.local
+*.db
+*.sqlite3
+*.db.backup_*
+
+# Logs
+logs/*.log
+*.log
+
+# Coverage / caches
+.coverage
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Test artifacts
+run_tests.bat
+test_output.txt
+temp_test_run/
+
+# Virtual environments (additional)
+.venv_rq10/
