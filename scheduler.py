@@ -49,8 +49,8 @@ class SchedulerManager:
             self.add_forecast_weekly_crawl_job()
             # 発注見通し集中巡回ジョブ (四半期初め: 1/4/7/10月 午前5時)
             self.add_forecast_quarterly_crawl_job()
-            # 毎朝アラート配信ジョブを追加 (毎日午前8時)
-            self.add_morning_digest_job()
+            # バックフィルジョブ (毎日午前3時)
+            self.add_backfill_job()
             # 毎朝アラート配信ジョブを追加 (毎日午前8時)
             self.add_morning_digest_job()
 
@@ -327,6 +327,60 @@ class SchedulerManager:
             logger.info("Morning digest job completed.")
         except Exception as e:
             logger.error(f"Morning digest job failed: {e}", exc_info=True)
+
+    def add_backfill_job(self):
+        """バックフィルジョブを追加（毎日午前3時実行）"""
+        job_id = "backfill_job"
+        self.scheduler.add_job(
+            self._run_backfill_async,
+            'cron',
+            hour=3,
+            minute=0,
+            id=job_id,
+            replace_existing=True,
+        )
+        self.logger.info(f"Scheduled backfill job: {job_id} (Daily at 03:00)")
+
+    def _run_backfill_async(self):
+        """バックフィルジョブを実行するラッパー"""
+        try:
+            from services.backfill_service import BackfillService
+            service = BackfillService()
+            
+            # 失敗済みジョブのリトライ
+            failed_jobs = service.list_jobs(status="failed")
+            for job in failed_jobs:
+                if job.retry_count < 3:
+                    service.retry_job(job.id)
+                    self.logger.info(f"Retrying failed backfill job: {job.id}")
+            
+            # 保留中ジョブの実行（直近7日以内に実行済みの同一機関ジョブはスキップ）
+            pending_jobs = service.list_jobs(status="pending", limit=50)
+            for job in pending_jobs:
+                # 同一機関・同一期間で直近7日以内に完了したジョブがあるかチェック
+                from datetime import timedelta
+                from database.models import BackfillJob, BackfillJobStatus
+                from database.session import get_db
+                
+                with get_db() as db:
+                    recent_done = db.query(BackfillJob).filter(
+                        BackfillJob.agency_id == job.agency_id,
+                        BackfillJob.start_date == job.start_date,
+                        BackfillJob.end_date == job.end_date,
+                        BackfillJob.status == BackfillJobStatus.DONE,
+                        BackfillJob.finished_at >= datetime.utcnow() - timedelta(days=7),
+                    ).first()
+                    
+                    if recent_done:
+                        self.logger.info(f"Skipping job {job.id}: similar job done recently")
+                        continue
+                
+                service.run_job(job.id)
+                self.logger.info(f"Executed backfill job: {job.id}")
+            
+            logger.info("Backfill job batch completed.")
+        except Exception as e:
+            logger.error(f"Backfill job batch failed: {e}", exc_info=True)
 
     def _run_award_crawl_async(self):
         """非同期フラグの無いrun_award_crawlを呼ぶラッパー。"""

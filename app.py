@@ -13,11 +13,17 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from config import AppConfig
+from database.models.user import User
 from database.repositories.extraction_result_repository import ExtractionResultRepository
 from services.analysis_service_core import AnalysisServiceCore, LLMAnalysisError
+from services.billing_service import ensure_stripe_customer
 from services.pdf_processor import PDFExtractionError, PDFProcessor
-from utils.auth_decorator import is_authenticated
+from utils.auth_decorator import is_authenticated, get_current_user
 from utils.logger import setup_logging
+from utils.plan_gate import get_user_limits, check_daily_limit
+from config import PlanConfig
+from database.repositories.extraction_result_repository import ExtractionResultRepository
+from datetime import date
 from utils.request_throttler import get_request_throttler
 from utils.security import validate_file_upload
 from utils.session_manager import get_session_manager
@@ -68,27 +74,69 @@ def get_gemini_key() -> Optional[str]:
 
 def show_login_screen(config: AppConfig) -> bool:
     """ログイン画面を表示し、認証成功時にセッション状態を書き込む。"""
-    st.markdown("## 🔐 ログイン")
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        username = st.text_input("ユーザー名")
-        password = st.text_input("パスワード", type="password")
-        if st.button("ログイン", type="primary"):
-            from database.engine import get_session
-            from services.auth_service import AuthService
-            with get_session() as session:
-                auth = AuthService(session, config)
-                user = auth.authenticate(username, password)
-                if user:
-                    token = auth.create_token(user)
-                    st.session_state.authenticated = True
-                    st.session_state.username = username
-                    st.session_state.auth_token = token
-                    st.session_state.session_id = get_session_manager(
-                        config.auth.session_timeout_minutes
-                    ).create_session(username)
-                    return True
-            st.error("ユーザー名またはパスワードが正しくありません")
+    tab_login, tab_register = st.tabs(["🔐 ログイン", "📝 新規登録（7日間無料トライアル）"])
+
+    with tab_login:
+        st.markdown("## 🔐 ログイン")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            username = st.text_input("ユーザー名", key="login_username")
+            password = st.text_input("パスワード", type="password", key="login_password")
+            if st.button("ログイン", type="primary", key="login_btn"):
+                from database.engine import get_session
+                from services.auth_service import AuthService
+                with get_session() as session:
+                    auth = AuthService(session, config)
+                    user = auth.authenticate(username, password)
+                    if user:
+                        token = auth.create_token(user)
+                        st.session_state.authenticated = True
+                        st.session_state.username = username
+                        st.session_state.auth_token = token
+                        st.session_state.session_id = get_session_manager(
+                            config.auth.session_timeout_minutes
+                        ).create_session(username)
+                        return True
+                st.error("ユーザー名またはパスワードが正しくありません")
+
+    with tab_register:
+        st.markdown("## 📝 新規登録")
+        st.caption("7日間の無料トライアル付き。クレジットカード登録不要で全機能お試しいただけます。")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            reg_username = st.text_input("ユーザー名", key="reg_username")
+            reg_email = st.text_input("メールアドレス", key="reg_email")
+            reg_password = st.text_input("パスワード", type="password", key="reg_password")
+            reg_password2 = st.text_input("パスワード（確認）", type="password", key="reg_password2")
+            if st.button("アカウント作成", type="primary", key="register_btn"):
+                if reg_password != reg_password2:
+                    st.error("パスワードが一致しません")
+                elif len(reg_password) < 6:
+                    st.error("パスワードは6文字以上で入力してください")
+                else:
+                    from database.engine import get_session
+                    from services.auth_service import AuthService
+                    with get_session() as session:
+                        auth = AuthService(session, config)
+                        # Check if username exists
+                        existing = session.query(User).filter(User.username == reg_username).first()
+                        if existing:
+                            st.error("このユーザー名は既に登録されています")
+                        else:
+                            user = auth.create_user(reg_username, reg_password, email=reg_email)
+                            # Create Stripe customer
+                            ensure_stripe_customer(user)
+                            session.commit()
+                            # Auto-login
+                            token = auth.create_token(user)
+                            st.session_state.authenticated = True
+                            st.session_state.username = reg_username
+                            st.session_state.auth_token = token
+                            st.session_state.session_id = get_session_manager(
+                                config.auth.session_timeout_minutes
+                            ).create_session(reg_username)
+                            st.success("アカウント作成完了！無料トライアルを開始します。")
+                            st.rerun()
     return False
 
 
@@ -177,6 +225,8 @@ def main() -> None:
             st.write(f"ようこそ、{st.session_state.get('username', 'unknown')} さん")
             if st.button("📜 履歴", use_container_width=True):
                 st.switch_page("app_history.py")
+            if st.button("💳 プラン・請求", use_container_width=True):
+                st.switch_page("app_billing.py")
             if st.button("🔓 ログアウト", use_container_width=True):
                 sid = st.session_state.get("session_id")
                 if sid:
@@ -240,6 +290,21 @@ def main() -> None:
             f"残りリクエスト: {throttler.get_remaining(client_key)}/"
             f"{config.rate_limit.max_requests_per_minute}（1分間）"
         )
+
+    # Plan gate: PDF extraction daily limit
+    if is_authenticated():
+        user = get_current_user()
+        if user:
+            limits = get_user_limits(user)
+            daily_limit = limits.get("pdf_extract_daily")
+            if daily_limit is not None:
+                repo = ExtractionResultRepository()
+                today_count = repo.count_by_user_today(user.id, date.today())
+                if today_count >= daily_limit:
+                    st.error(f"⚠️ 本日のPDF抽出上限（{daily_limit}件/日）に達しました。")
+                    st.info("👉 [プラン・請求ページ](app_billing.py) からアップグレードすると無制限になります。")
+                    st.stop()
+                st.caption(f"本日の抽出: {today_count}/{daily_limit} 件")
 
     uploaded_file = st.file_uploader("📄 入札仕様書PDFを選択（20MBまで）", type=["pdf"])
     if uploaded_file is None:

@@ -2,6 +2,7 @@
 from ._generated import Base
 from ._generated import Agency as Agency
 from ._generated import AgencyCategory as AgencyCategory
+from ._generated import AgencyInventory as AgencyInventory
 from ._generated import CrawlConfig as CrawlConfig
 from ._generated import AlertHistory as AlertHistory
 from ._generated import Competitor as Competitor
@@ -43,3 +44,6 @@ from ._generated import BidAssignment as BidAssignment
 from ._generated import NotificationChannel as NotificationChannel
 from ._generated import Favorite as Favorite
 from ._generated import CompetitorAlertConfig as ForecastAlertConfig
+from ._generated import BackfillJob as BackfillJob
+from ._generated import BackfillJobStatus as BackfillJobStatus
+from ._generated import BackfillJobLog as BackfillJobLog

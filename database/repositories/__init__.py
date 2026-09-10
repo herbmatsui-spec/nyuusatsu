@@ -4,6 +4,7 @@ NOTE: These are reconstructed thin wrappers over the generated models. The exact
 method surface of the original package is not fully known; add project-specific
 query methods here as call sites require them.
 """
+from datetime import date
 from ..models import AwardResult as _AwardResult
 from ..models import Bid as _Bid
 from ..models import Agency as _Agency
@@ -53,6 +54,17 @@ class AgencyRepository(BaseRepository):
 
 class ExtractionResultRepository(BaseRepository):
     model = _ExtractionResult
+
+    def count_by_user_today(self, user_id: int, target_date: date) -> int:
+        """Count extraction results created by user on a specific date."""
+        from datetime import datetime, timedelta
+        start = datetime.combine(target_date, datetime.min.time())
+        end = start + timedelta(days=1)
+        return self.session.query(self.model).filter(
+            self.model.created_by == str(user_id),
+            self.model.created_at >= start,
+            self.model.created_at < end
+        ).count()
 
 
 class CustomerRepository(BaseRepository):

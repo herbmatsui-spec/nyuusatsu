@@ -12,7 +12,7 @@ import plotly.express as px
 import pandas as pd
 import json
 import os
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from dotenv import load_dotenv
 
 from database.engine import get_session
@@ -20,8 +20,11 @@ from services.bid_service import BidService
 from services.crawl_service import CrawlService
 from database.repositories.bid_repository import BidRepository
 from database.repositories.favorite_repository import FavoriteRepository
-from config import AppConfig
+from config import AppConfig, PlanConfig
 from utils.ui import inject_custom_css
+from utils.auth_decorator import is_authenticated, get_current_user
+from services.billing_service import get_effective_plan, is_trial_active
+from utils.plan_gate import get_user_limits, require_feature, check_daily_limit
 
 load_dotenv()
 
@@ -58,6 +61,24 @@ with st.sidebar:
         "ステータス凡例: "
         "📥 未確認 → 🔍 検討中 → 📝 応募済 → 🏆 落札 / ❌ 失注"
     )
+    st.divider()
+    
+    # Plan display
+    if is_authenticated():
+        user = get_current_user()
+        if user:
+            effective = get_effective_plan(user)
+            plan_names = {"free": "無料", "standard": "スタンダード", "pro": "プロ", "enterprise": "エンタープライズ"}
+            if is_trial_active(user):
+                trial_days = (user.trial_ends_at - datetime.utcnow()).days
+                st.sidebar.success(f"🎁 無料トライアル中 ({trial_days}日残り)")
+                st.sidebar.caption(f"プラン: {plan_names.get(effective, effective).upper()} 相当")
+            else:
+                st.sidebar.info(f"📋 プラン: {plan_names.get(user.plan, user.plan).upper()}")
+                if user.current_period_end:
+                    st.sidebar.caption(f"次回更新: {user.current_period_end.strftime('%m/%d')}")
+            if st.sidebar.button("💳 プラン変更", use_container_width=True):
+                st.switch_page("app_billing.py")
 
 # Initialize DB connection
 try:
@@ -167,6 +188,10 @@ elif menu == "🔍 検索":
     st.title("🔍 案件検索")
     st.markdown("フィルタ条件を設定して案件を検索します。")
 
+    # Plan gate for search
+    user = get_current_user() if is_authenticated() else None
+    limits = get_user_limits(user) if user else PlanConfig.LIMITS[PlanConfig.FREE]
+
     # 全案件からユニークな発注機関を取得してプルダウンに設定
     all_bids = bid_service.get_all_bids()
     org_list = sorted(list(set([str(b.get("organization_name") or "不明") for b in all_bids])))
@@ -198,15 +223,23 @@ elif menu == "🔍 検索":
     if org_filter and org_filter != "すべて":
         filters["organization_name"] = org_filter
 
+    # Free plan: limit search to last 7 days
+    if limits["search_days"] is not None:
+        cutoff_date = (datetime.utcnow() - timedelta(days=limits["search_days"])).strftime("%Y-%m-%d")
+        filters["created_after"] = cutoff_date
+        st.caption(f"ℹ️ 無料プランは直近 {limits['search_days']} 日のみ検索可能です")
+
     if st.button("検索実行"):
         results = bid_service.get_all_bids(filters)
         st.info(f"検索結果: {len(results)} 件")
         st.dataframe(pd.DataFrame(results), use_container_width=True, hide_index=True)
 
-        # Export options
-        if results:
+        # Export options - plan gated
+        if results and limits["export"]:
             csv = pd.DataFrame(results).to_csv(index=False).encode('utf-8-sig')
             st.download_button("💾 CSVエクスポート", data=csv, file_name="search_results.csv", mime="text/csv")
+        elif results and not limits["export"]:
+            st.caption("🔒 CSV/JSONエクスポートはスタンダードプラン以上で利用可能です")
 
 
 elif menu == "💰 コスト":
@@ -215,6 +248,9 @@ elif menu == "💰 コスト":
 elif menu == "⭐ お気に入り":
     st.title("⭐ お気に入り案件")
     st.markdown("スターを付けた案件を絞り込み・管理します。")
+
+    user = get_current_user() if is_authenticated() else None
+    limits = get_user_limits(user) if user else PlanConfig.LIMITS[PlanConfig.FREE]
 
     user_id = st.session_state.get("user_id", "default")
     favs = bid_service.list_favorites(user_id=user_id)
@@ -235,12 +271,15 @@ elif menu == "⭐ お気に入り":
     if filtered_favs:
         st.dataframe(pd.DataFrame(filtered_favs))
 
-        if export_format == "CSV":
-            csv = pd.DataFrame(filtered_favs).to_csv(index=False).encode("utf-8-sig")
-            st.download_button("💾 CSVエクスポート", data=csv, file_name="favorites.csv", mime="text/csv")
+        if limits["export"]:
+            if export_format == "CSV":
+                csv = pd.DataFrame(filtered_favs).to_csv(index=False).encode("utf-8-sig")
+                st.download_button("💾 CSVエクスポート", data=csv, file_name="favorites.csv", mime="text/csv")
+            else:
+                json_bytes = json.dumps(filtered_favs, ensure_ascii=False, indent=2).encode("utf-8")
+                st.download_button("💾 JSONエクスポート", data=json_bytes, file_name="favorites.json", mime="application/json")
         else:
-            json_bytes = json.dumps(filtered_favs, ensure_ascii=False, indent=2).encode("utf-8")
-            st.download_button("💾 JSONエクスポート", data=json_bytes, file_name="favorites.json", mime="application/json")
+            st.caption("🔒 CSV/JSONエクスポートはスタンダードプラン以上で利用可能です")
 
     st.divider()
     st.subheader("削除対象を選択")
