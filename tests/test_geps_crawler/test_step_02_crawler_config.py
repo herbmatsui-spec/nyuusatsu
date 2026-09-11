@@ -1,6 +1,6 @@
 
 from geps_crawler import CrawlerConfig
-from config import AppConfig
+from config_dir import AppConfig
 
 def test_crawler_config_defaults():
     """CrawlerConfigのデフォルト値が正しいか"""

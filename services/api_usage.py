@@ -1,5 +1,5 @@
 """API usage tracking and limits."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from database.engine import get_session
@@ -20,7 +20,7 @@ def check_api_limit() -> bool:
         return False  # not allowed or unlimited handled elsewhere
 
     with get_session() as session:
-        current_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         usage = session.query(ApiUsage).filter(
             ApiUsage.user_id == user.id,
             ApiUsage.month == current_month
@@ -36,7 +36,7 @@ def increment_api_usage() -> int:
         return 0
 
     with get_session() as session:
-        current_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         usage = session.query(ApiUsage).filter(
             ApiUsage.user_id == user.id,
             ApiUsage.month == current_month
@@ -62,7 +62,7 @@ def get_api_usage() -> dict:
     monthly_limit = limits.get("api_requests_monthly", 0)
 
     with get_session() as session:
-        current_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         usage = session.query(ApiUsage).filter(
             ApiUsage.user_id == user.id,
             ApiUsage.month == current_month

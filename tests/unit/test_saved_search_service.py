@@ -40,7 +40,16 @@ def test_create_and_get_saved_search(db_session):
 
 def test_match_new_bids(db_session):
     service = SavedSearchService(db_session)
-    bid = Bid(filename="web.pdf", source_url="http://x/1", budget="500万円", budget_amount=5000000)
+    bid = Bid(
+        filename="web.pdf",
+        source_url="http://x/1",
+        budget="500万円",
+        budget_amount=5000000,
+        analyzed_at=datetime.utcnow(),
+        current_status="未確認",
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
     db_session.add(bid)
     db_session.flush()
     saved = service.create(user_id="u1", name="条件", criteria={"keywords": "web"})
@@ -51,7 +60,14 @@ def test_match_new_bids(db_session):
 
 def test_match_new_bids_excludes_old(db_session):
     service = SavedSearchService(db_session)
-    bid = Bid(filename="old.pdf", source_url="http://x/2", created_at=datetime(2020, 1, 1))
+    bid = Bid(
+        filename="old.pdf",
+        source_url="http://x/2",
+        created_at=datetime(2020, 1, 1),
+        analyzed_at=datetime.utcnow(),
+        current_status="未確認",
+        updated_at=datetime.utcnow(),
+    )
     db_session.add(bid)
     db_session.flush()
     saved = service.create(user_id="u1", name="条件", criteria={})
@@ -61,7 +77,15 @@ def test_match_new_bids_excludes_old(db_session):
 
 def test_channel_repository_crud(db_session):
     repo = NotificationChannelRepository(db_session)
-    ch = repo.create({"user_id": "u1", "channel_type": "slack", "webhook_url": "http://h"})
+    now = datetime.utcnow()
+    ch = repo.create(
+        user_id="u1",
+        channel_type="slack",
+        webhook_url="http://h",
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
     assert ch.id is not None
     loaded = repo.get_active_by_user("u1")
     assert len(loaded) == 1

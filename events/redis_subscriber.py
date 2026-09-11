@@ -2,7 +2,7 @@ import redis
 import json
 import logging
 from typing import Any, Dict, Callable, List
-from config import AppConfig
+from config_dir import AppConfig
 
 logger = logging.getLogger(__name__)
 

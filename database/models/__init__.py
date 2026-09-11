@@ -47,3 +47,17 @@ from ._generated import CompetitorAlertConfig as ForecastAlertConfig
 from ._generated import BackfillJob as BackfillJob
 from ._generated import BackfillJobStatus as BackfillJobStatus
 from ._generated import BackfillJobLog as BackfillJobLog
+
+from .quality_metric import QualityMetric as QualityMetric
+from .quality_threshold import QualityThreshold as QualityThreshold
+from .quality_alert import QualityAlert as QualityAlert
+from .quality_metric import Base as QualityMetricBase
+from .quality_threshold import Base as QualityThresholdBase
+from .quality_alert import Base as QualityAlertBase
+
+_quality_bases = (QualityMetricBase, QualityThresholdBase, QualityAlertBase)
+
+
+def create_all_quality_tables(bind):
+    for base in _quality_bases:
+        base.metadata.create_all(bind=bind)

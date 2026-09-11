@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 import pdfplumber
 
@@ -204,7 +204,7 @@ class BidAnalysisService:
         # 予算金額の数値化
         bid.budget_amount = parse_budget(bid.budget)
         bid.full_text = text
-        bid.analyzed_at = datetime.utcnow()
+        bid.analyzed_at = datetime.now(timezone.utc)
         
         self.session.flush()
 

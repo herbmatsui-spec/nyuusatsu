@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any
 from database.session import SessionLocal
 from services.bid_analysis_service import BidAnalysisService
-from config import AppConfig
+from config_dir import AppConfig
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 import time
 import threading
 from dataclasses import dataclass
-from config import AppConfig
+from config_dir import AppConfig
 
 @dataclass
 class RateLimitConfig:

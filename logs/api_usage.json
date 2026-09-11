@@ -1,0 +1,16 @@
+[
+  {
+    "date": "2026-09-10",
+    "total_prompt_tokens": 0,
+    "total_completion_tokens": 0,
+    "total_requests": 2,
+    "providers": {
+      "mock": {
+        "model": "unknown",
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "requests": 2
+      }
+    }
+  }
+]

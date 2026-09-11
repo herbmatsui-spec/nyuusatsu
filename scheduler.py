@@ -53,6 +53,10 @@ class SchedulerManager:
             self.add_backfill_job()
             # 毎朝アラート配信ジョブを追加 (毎日午前8時)
             self.add_morning_digest_job()
+            # 品質メトリクス収集ジョブを追加 (毎日午前5時30分)
+            self.add_quality_metrics_job()
+            # 品質アラート評価ジョブを追加 (毎日午前5時45分)
+            self.add_quality_alert_evaluation_job()
 
     def stop(self):
         if self._is_running:
@@ -112,7 +116,7 @@ class SchedulerManager:
     def _run_metrics_cleanup(self):
         try:
             from scripts.cleanup_metrics import cleanup_old_metrics
-            from config import AppConfig
+            from config_dir import AppConfig
             config = AppConfig()
             retention_days = config.observability.metrics_retention_days
             cleanup_old_metrics(retention_days)
@@ -327,6 +331,50 @@ class SchedulerManager:
             logger.info("Morning digest job completed.")
         except Exception as e:
             logger.error(f"Morning digest job failed: {e}", exc_info=True)
+
+    def add_quality_metrics_job(self):
+        """品質メトリクス収集ジョブを毎日午前5時30分に登録する。"""
+        job_id = "collect_quality_metrics_job"
+        self.scheduler.add_job(
+            self._run_collect_quality_metrics_async,
+            'cron',
+            hour=5,
+            minute=30,
+            id=job_id,
+            replace_existing=True,
+        )
+        self.logger.info(f"Scheduled quality metrics collection job: {job_id} (Daily at 05:30)")
+
+    def _run_collect_quality_metrics_async(self):
+        """品質メトリクス収集を実行するラッパー。"""
+        try:
+            from scripts.collect_quality_metrics import run as collect_metrics
+            collect_metrics()
+            self.logger.info("Quality metrics collection job completed.")
+        except Exception as e:
+            self.logger.error(f"Quality metrics collection job failed: {e}", exc_info=True)
+
+    def add_quality_alert_evaluation_job(self):
+        """品質アラート評価ジョブを毎日午前5時45分に登録する。"""
+        job_id = "evaluate_quality_alerts_job"
+        self.scheduler.add_job(
+            self._run_evaluate_quality_alerts_async,
+            'cron',
+            hour=5,
+            minute=45,
+            id=job_id,
+            replace_existing=True,
+        )
+        self.logger.info(f"Scheduled quality alert evaluation job: {job_id} (Daily at 05:45)")
+
+    def _run_evaluate_quality_alerts_async(self):
+        """品質アラート評価を実行するラッパー。"""
+        try:
+            from scripts.evaluate_quality_alerts import run as evaluate_alerts
+            evaluate_alerts()
+            self.logger.info("Quality alert evaluation job completed.")
+        except Exception as e:
+            self.logger.error(f"Quality alert evaluation job failed: {e}", exc_info=True)
 
     def add_backfill_job(self):
         """バックフィルジョブを追加（毎日午前3時実行）"""

@@ -4,9 +4,9 @@
 import json
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger("CostManager")
 
@@ -19,79 +19,80 @@ class CostManager:
         # 環境変数から上限設定を読み込み（デフォルト値あり）
         self.daily_token_limit = int(os.getenv("LLM_DAILY_TOKEN_LIMIT", 1000000))
         self.daily_request_limit = int(os.getenv("LLM_DAILY_REQUEST_LIMIT", 1000))
-        
+
         # ログディレクトリの作成
         self.usage_log_path.parent.mkdir(parents=True, exist_ok=True)
         if not self.usage_log_path.exists():
             self._save_usage([])
 
     def _load_usage(self) -> List[Dict[str, Any]]:
-        """利用ログファイルを読み込む"""
-        try:
-            with open(self.usage_log_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return []
+        if self.usage_log_path.exists():
+            try:
+                with open(self.usage_log_path, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, FileNotFoundError):
+                return []
+        return []
 
-    def _save_usage(self, data: List[Dict[str, Any]]):
-        """利用ログファイルを保存する"""
-        with open(self.usage_log_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+    def _save_usage(self, usage_data: List[Dict[str, Any]]) -> None:
+        with open(self.usage_log_path, 'w') as f:
+            json.dump(usage_data, f, indent=2, ensure_ascii=False)
 
-    def record_usage(self, provider: str, model: str, prompt_tokens: int, completion_tokens: int):
-        """
-        API利用実績を記録する。
-        """
-        usage = self._load_usage()
+    def record_usage(self, provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> None:
+        usage_data = self._load_usage()
+        today = datetime.now(timezone.utc).date().isoformat()
         
-        new_entry = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "provider": provider,
-            "model": model,
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": prompt_tokens + completion_tokens
-        }
+        # 今日のエントリーを見つけるか、新しく作る
+        today_entry = None
+        for entry in usage_data:
+            if entry.get("date") == today:
+                today_entry = entry
+                break
         
-        usage.append(new_entry)
-        self._save_usage(usage)
-        logger.info(f"Recorded usage for {provider}/{model}: {new_entry['total_tokens']} tokens")
+        if today_entry is None:
+            today_entry = {
+                "date": today,
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+                "total_requests": 0,
+                "providers": {}
+            }
+            usage_data.append(today_entry)
+        
+        # トークン数を更新
+        today_entry["total_prompt_tokens"] += prompt_tokens
+        today_entry["total_completion_tokens"] += completion_tokens
+        today_entry["total_requests"] += 1
+        
+        # プロバイダー別の使用状況を更新
+        if provider not in today_entry["providers"]:
+            today_entry["providers"][provider] = {
+                "model": model,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "requests": 0
+            }
+        
+        provider_data = today_entry["providers"][provider]
+        provider_data["prompt_tokens"] += prompt_tokens
+        provider_data["completion_tokens"] += completion_tokens
+        provider_data["requests"] += 1
+        
+        # 使用状況を保存
+        self._save_usage(usage_data)
 
-    def get_daily_usage(self, date_str: Optional[str] = None) -> Dict[str, Any]:
-        """
-        指定した日付（YYYY-MM-DD）の合計消費量を取得する。
-        date_strがNoneの場合は今日。
-        """
-        if date_str is None:
-            date_str = datetime.utcnow().strftime("%Y-%m-%d")
-            
-        usage = self._load_usage()
-        total_tokens = 0
-        total_requests = 0
-        
-        for entry in usage:
-            if entry["timestamp"].startswith(date_str):
-                total_tokens += entry.get("total_tokens", 0)
-                total_requests += 1
-                
-        return {
-            "date": date_str,
-            "total_tokens": total_tokens,
-            "total_requests": total_requests
-        }
+    def get_usage(self, date: Optional[str] = None) -> List[Dict[str, Any]]:
+        usage_data = self._load_usage()
+        if date is None:
+            return usage_data
+        return [entry for entry in usage_data if entry.get("date") == date]
 
-    def is_limit_exceeded(self) -> bool:
-        """
-        本日の消費量が上限を超えているか判定する。
-        """
-        today_usage = self.get_daily_usage()
+    def check_limit(self) -> bool:
+        usage_data = self._load_usage()
+        today = datetime.now(timezone.utc).date().isoformat()
         
-        if today_usage["total_tokens"] > self.daily_token_limit:
-            logger.warning(f"Daily token limit exceeded: {today_usage['total_tokens']} / {self.daily_token_limit}")
-            return True
-            
-        if today_usage["total_requests"] > self.daily_request_limit:
-            logger.warning(f"Daily request limit exceeded: {today_usage['total_requests']} / {self.daily_request_limit}")
-            return True
-            
-        return False
+        for entry in usage_data:
+            if entry.get("date") == today:
+                total_tokens = entry.get("total_prompt_tokens", 0) + entry.get("total_completion_tokens", 0)
+                return total_tokens < self.daily_token_limit
+        return True  # 今日の使用記録がない場合は制限内とみなす

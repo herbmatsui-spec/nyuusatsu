@@ -28,7 +28,7 @@ def parse_contract_amount(text: str) -> Optional[int]:
 
 def calculate_award_rate(budget: Optional[int], contract: Optional[int]) -> Optional[float]:
     """予定価格と落札価格から落札率(%)を算出。"""
-    if budget and contract and budget > 0:
+    if budget is not None and budget > 0 and contract is not None:
         return round((contract / budget) * 100, 2)
     return None
 
@@ -38,9 +38,9 @@ def parse_date(text: str) -> Optional[datetime]:
     if not text:
         return None
     patterns = [
-        (r"(\d{4})[年/\-](\d{1,2})[月/\-](\d{1,2})日?", lambda m: datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))),
-        (r"令和(\d+)年(\d+)月(\d+)日?", lambda m: datetime(2018 + int(m.group(1)), int(m.group(2)), int(m.group(3)))),
-        (r"平成(\d+)年(\d+)月(\d+)日?", lambda m: datetime(1988 + int(m.group(1)), int(m.group(2)), int(m.group(3)))),
+        (r"(\d{4})\s*[年/\-]\s*(\d{1,2})\s*[月/\-]\s*(\d{1,2})日?", lambda m: datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))),
+        (r"令和\s*(\d+|元)\s*年\s*(\d+)\s*月\s*(\d+)日?", lambda m: datetime(2018 + (1 if m.group(1) == '元' else int(m.group(1))), int(m.group(2)), int(m.group(3)))),
+        (r"平成\s*(\d+|元)\s*年\s*(\d+)\s*月\s*(\d+)日?", lambda m: datetime(1988 + (1 if m.group(1) == '元' else int(m.group(1))), int(m.group(2)), int(m.group(3)))),
     ]
     for pattern, builder in patterns:
         m = re.search(pattern, text)
@@ -54,13 +54,13 @@ def parse_date(text: str) -> Optional[datetime]:
 
 def parse_winner_name(text: str) -> Optional[str]:
     """落札企業名を抽出。"""
-    if not text:
+    if not text or text.isspace():
         return None
-    # 「株式会社○○」「(株)○○」「○○(有)」等を抽出
-    m = re.search(r"([^\s　\n]+(?:株式会社|(?:株)?(?:会社)?|(?:有)?(?:限)?(?:会社)?|Corp\.?|Ltd\.?)[^\s　\n]*)", text)
-    if m:
-        return m.group(1).strip()
-    return text.strip() or None
+    text = text.strip()
+    for prefix in ("落札者：", "契約者：", "発注者：", "業者：", "供給者："):
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+    return text  # Can be empty string
 
 
 def extract_industry_from_text(text: str) -> Optional[str]:
@@ -71,8 +71,8 @@ def extract_industry_from_text(text: str) -> Optional[str]:
         "建設": ["建設", "建築", "土木", "舗装", "管工事", "造園"],
         "IT": ["システム", "ソフトウェア", "ネットワーク", "データセンター", "クラウド"],
         "コンサル": ["コンサルティング", "調査", "計画", "設計"],
-        "物品": ["物品", "備品", "機器", "設備"],
-        "委託": ["委託", "業務委託", "サービス"],
+        "物品": ["物品", "備品", "機器", "設備", "用品"],
+        "委託": ["委託", "業務委託", "サービス", "業務"],
     }
     lower = text.lower()
     for category, kws in keywords.items():

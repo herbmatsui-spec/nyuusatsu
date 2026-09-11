@@ -20,7 +20,7 @@ from services.bid_service import BidService
 from services.crawl_service import CrawlService
 from database.repositories.bid_repository import BidRepository
 from database.repositories.favorite_repository import FavoriteRepository
-from config import AppConfig, PlanConfig
+from config_dir import AppConfig, PlanConfig
 from utils.ui import inject_custom_css
 from utils.auth_decorator import is_authenticated, get_current_user
 from services.billing_service import get_effective_plan, is_trial_active
@@ -52,7 +52,7 @@ with st.sidebar:
     st.header("📋 メニュー")
     menu = st.radio(
         "表示する画面を選択",
-        ["📊 概要", "📈 分析", "🔍 検索", "⭐ お気に入り", "🕒 履歴", "💰 コスト", "🔔 通知設定", "🏢 競合分析", "🛠 データ品質", "🔔 アラート履歴", "🏢 自社資格", "📄 仕様書アーカイブ", "📅 カレンダー", "🗂 カンバン", "💡 価格シミュレータ"],
+        ["📊 概要", "📈 分析", "🔍 検索", "⭐ お気に入り", "🕒 履歴", "💰 コスト", "🔔 通知設定", "🏢 競合分析", "🛠 データ品質", "📊 品質メトリクス", "🔔 アラート履歴", "🏢 自社資格", "📄 仕様書アーカイブ", "📅 カレンダー", "🗂 カンバン", "💡 価格シミュレータ"],
         key="menu_selection"
     )
     st.caption("📊 概要: KPIと分布  /  📈 分析: 市場落札率  /  🔍 検索: 案件一覧  /  ⭐ お気に入り  /  🕒 履歴  /  💰 コスト  /  🔔 通知")
@@ -354,6 +354,159 @@ elif menu == "🛠 データ品質":
     if report['details'].get('missing_winner'):
         st.subheader("落札者欠損例")
         st.dataframe(pd.DataFrame(report['details']['missing_winner']))
+
+elif menu == "📊 品質メトリクス":
+    st.title("📊 品質メトリクス ダッシュボード")
+    st.markdown("過去30日間の品質メトリクス推移と閾値ラインを表示します。")
+    
+    from services.quality_metrics_service import QualityMetricsService
+    from database.models.quality_metric import QualityMetric
+    from database.models.quality_threshold import QualityThreshold
+    import plotly.graph_objects as go
+    
+    with get_session() as session:
+        # 閾値を取得
+        thresholds = session.query(QualityThreshold).all()
+        threshold_map = {t.metric_name: {"warn": t.warn_at, "alert": t.alert_at} for t in thresholds}
+        
+        # YAMLからの閾値も取得（DBにない場合のフォールバック）
+        import yaml
+        import os
+        yaml_path = os.getenv("QUALITY_THRESHOLDS_PATH", "config/quality_thresholds.yaml")
+        yaml_thresholds = {}
+        if os.path.exists(yaml_path):
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+                yaml_thresholds = data.get("metrics", {}) or {}
+        
+        # 過去30日間のメトリクスを取得
+        cutoff = datetime.utcnow() - timedelta(days=30)
+        metrics = session.query(QualityMetric).filter(
+            QualityMetric.recorded_at >= cutoff
+        ).order_by(QualityMetric.metric_name, QualityMetric.recorded_at).all()
+        
+        if not metrics:
+            st.info("過去30日間の品質メトリクスデータがありません。収集ジョブの実行をお待ちください。")
+        else:
+            # メトリクスごとにグループ化
+            from collections import defaultdict
+            metrics_by_name = defaultdict(list)
+            for m in metrics:
+                metrics_by_name[m.metric_name].append(m)
+            
+            # 表示する主要メトリクス
+            key_metrics = [
+                "missing_field_rate",
+                "duplicate_rate",
+                "acquisition_delay_median",
+                "coverage_rate",
+                "coverage_municipality_rate",
+            ]
+            
+            # タブで各メトリクスを表示
+            tabs = st.tabs(key_metrics)
+            
+            for i, metric_name in enumerate(key_metrics):
+                with tabs[i]:
+                    st.subheader(metric_name)
+                    
+                    if metric_name not in metrics_by_name:
+                        st.info(f"{metric_name} のデータがありません")
+                        continue
+                    
+                    data = metrics_by_name[metric_name]
+                    df = pd.DataFrame([{
+                        "日時": m.recorded_at,
+                        "値": m.value,
+                    } for m in data])
+                    
+                    # 閾値を取得（YAML優先、DBフォールバック）
+                    warn_val = None
+                    alert_val = None
+                    if metric_name in yaml_thresholds:
+                        warn_val = yaml_thresholds[metric_name].get("warning")
+                        alert_val = yaml_thresholds[metric_name].get("critical")
+                    elif metric_name in threshold_map:
+                        warn_val = threshold_map[metric_name]["warn"]
+                        alert_val = threshold_map[metric_name]["alert"]
+                    
+                    # Plotly グラフ作成
+                    fig = go.Figure()
+                    
+                    # メトリクス値のライン
+                    fig.add_trace(go.Scatter(
+                        x=df["日時"],
+                        y=df["値"],
+                        mode="lines+markers",
+                        name=metric_name,
+                        line=dict(color="#2563eb", width=2),
+                        marker=dict(size=6),
+                    ))
+                    
+                    # 警告閾値ライン
+                    if warn_val is not None:
+                        fig.add_hline(
+                            y=warn_val,
+                            line_dash="dash",
+                            line_color="#f59e0b",
+                            annotation_text=f"Warning: {warn_val}",
+                            annotation_position="top right",
+                        )
+                    
+                    # アラート閾値ライン
+                    if alert_val is not None:
+                        fig.add_hline(
+                            y=alert_val,
+                            line_dash="dash",
+                            line_color="#ef4444",
+                            annotation_text=f"Critical: {alert_val}",
+                            annotation_position="bottom right",
+                        )
+                    
+                    fig.update_layout(
+                        xaxis_title="日時",
+                        yaxis_title="値",
+                        height=400,
+                        hovermode="x unified",
+                        showlegend=True,
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # 現在値とステータス表示
+                    current_value = df["値"].iloc[-1]
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("現在値", f"{current_value:.2f}")
+                    
+                    # ステータス判定
+                    status = "正常"
+                    status_color = "green"
+                    if alert_val is not None:
+                        if metric_name in yaml_thresholds and yaml_thresholds[metric_name].get("lower_is_worse", False):
+                            if current_value <= alert_val:
+                                status = "🔴 アラート"
+                                status_color = "red"
+                        elif current_value >= alert_val:
+                            status = "🔴 アラート"
+                            status_color = "red"
+                    if status == "正常" and warn_val is not None:
+                        if metric_name in yaml_thresholds and yaml_thresholds[metric_name].get("lower_is_worse", False):
+                            if current_value <= warn_val:
+                                status = "⚠️ 警告"
+                                status_color = "orange"
+                        elif current_value >= warn_val:
+                            status = "⚠️ 警告"
+                            status_color = "orange"
+                    
+                    col2.metric("ステータス", status)
+                    
+                    # 統計サマリー
+                    col3.metric("平均値", f"{df['値'].mean():.2f}")
+                    
+                    # データテーブル表示
+                    with st.expander("詳細データ"):
+                        st.dataframe(df.sort_values("日時", ascending=False), use_container_width=True)
+
 elif menu == "🏢 自社資格":
     from services.company_profile_page import render_company_profile_page
     render_company_profile_page()

@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 import streamlit as st
 from dotenv import load_dotenv
 
-from config import AppConfig
+from config_dir import AppConfig
 from database.models.user import User
 from database.repositories.extraction_result_repository import ExtractionResultRepository
 from services.analysis_service_core import AnalysisServiceCore, LLMAnalysisError

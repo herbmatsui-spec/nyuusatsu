@@ -8,7 +8,7 @@ sys.path.append(os.getcwd())
 from services.bid_analysis_service import BidAnalysisService
 
 from database.session import get_db
-from config import AppConfig
+from config_dir import AppConfig
 
 # 実際のセッション
 with get_db() as session:

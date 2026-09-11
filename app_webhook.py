@@ -1,7 +1,7 @@
 """Stripe Webhook endpoint - FastAPI."""
 from fastapi import FastAPI, Request, Header, HTTPException
 import stripe
-from config import AppConfig
+from config_dir import AppConfig
 from services.billing_service import handle_webhook_event
 
 _config = AppConfig()

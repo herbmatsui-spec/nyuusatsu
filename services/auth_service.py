@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
@@ -27,7 +27,7 @@ class AuthService:
         return user
 
     def create_user(self, username: str, password: str, org_id: Optional[int] = None, email: Optional[str] = None) -> User:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         user = User(
             username=username,
             email=email,
@@ -58,7 +58,7 @@ class AuthService:
         payload = {
             "sub": str(user.id),
             "username": user.username,
-            "exp": datetime.utcnow() + timedelta(minutes=expires_minutes),
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=expires_minutes),
         }
         return jwt.encode(payload, "secret", algorithm="HS256")
 

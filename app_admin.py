@@ -4,187 +4,6 @@ app_admin.py — 管理画面
 組織・ユーザー・ロールの管理を行う。
 """
 import streamlit as st
-
-from database.engine import get_session
-from services.auth_service import AuthService
-from database.models.organization import Organization
-from database.models.user import User
-from database.models.role import Role
-from database.models.crawl_priority import CrawlPriority
-from database.models.agency_inventory import AgencyInventory
-from database.models.qa_review import QAReview, QAStatusEnum
-from database.models import SystemSetting
-from config import AppConfig
-from database.models.quality_threshold import QualityThreshold
-
-
-def render():
-    st.set_page_config(page_title="管理画面", page_icon="🛠", layout="wide")
-    st.title("🛠 システム管理")
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["組織", "ユーザー", "ロール", "優先度マトリクス", "発注機関インベントリ", "人手チェック", "品質しきい値", "システム設定"])
-
-    with get_session() as session:
-        auth = AuthService(session)
-
-        with tab1:
-            st.subheader("組織")
-            with st.form("add_org"):
-                name = st.text_input("組織名")
-                code = st.text_input("コード")
-                if st.form_submit_button("追加") and name:
-                    org = Organization(name=name, code=code)
-                    session.add(org)
-                    session.commit()
-                    st.rerun()
-            for org in session.query(Organization).all():
-                st.write(f"- {org.name} ({org.code})")
-
-        with tab2:
-            st.subheader("ユーザー")
-            with st.form("add_user"):
-                u_name = st.text_input("ユーザー名")
-                u_pass = st.text_input("パスワード", type="password")
-                u_email = st.text_input("メール")
-                orgs = session.query(Organization).all()
-                u_org = st.selectbox("組織", orgs, format_func=lambda o: o.name)
-                if st.form_submit_button("追加") and u_name:
-                    auth.create_user(u_name, u_pass, org_id=u_org.id if u_org else None, email=u_email)
-                    session.commit()
-                    st.rerun()
-            for user in session.query(User).all():
-                st.write(f"- {user.username} ({user.email})")
-
-        with tab3:
-            st.subheader("ロール")
-            with st.form("add_role"):
-                r_name = st.text_input("ロール名")
-                r_perms = st.text_area("権限 (JSON)", value='["bid:read"]')
-                if st.form_submit_button("追加") and r_name:
-                    role = Role(name=r_name, permissions_json=r_perms)
-                    session.add(role)
-                    session.commit()
-                    st.rerun()
-            for role in session.query(Role).all():
-                st.write(f"- {role.name}: {role.permissions_json}")
-        
-        with tab4:
-            st.subheader("優先度マトリクス")
-            priorities = session.query(CrawlPriority).all()
-            if priorities:
-                import pandas as pd
-                data = [{
-                    "都道府県コード": p.prefecture_code,
-                    "都道府県名": p.prefecture_name,
-                    "機関数": p.agency_count,
-                    "業種一致度": p.target_industry_match,
-                    "スコア": p.score,
-                    "状態": p.status.value if hasattr(p.status, 'value') else p.status
-                } for p in priorities]
-                df = pd.DataFrame(data)
-                st.dataframe(df)
-            else:
-                st.info("優先度データがありません。スクリプトを実行してください。")
-        
-        with tab5:
-            st.subheader("発注機関インベントリ")
-            inv_list = session.query(AgencyInventory).filter_by(is_crawled=False).limit(100).all()
-            if inv_list:
-                import pandas as pd
-                data = [{
-                    "ID": inv.id,
-                    "機関名": inv.agency_name,
-                    "都道府県コード": inv.prefecture_code,
-                    "市区町村": inv.municipality,
-                    "入札ページ": inv.bid_page_url,
-                    "状態": "未クロール" if not inv.is_crawled else "クロール済"
-                } for inv in inv_list]
-                df = pd.DataFrame(data)
-                st.dataframe(df)
-                if st.button("未クロール機関を全てクロール開始"):
-                    st.write("※ クロールはバックエンドジョブで実行されます (実装未定)")
-            else:
-                st.info("全ての機関がクロール済みです。")
-        # 人手チェック (QA) タブ
-        with tab6:
-            st.subheader("人手チェック (QA)")
-            pending = session.query(QAReview).filter(QAReview.status == QAStatusEnum.PENDING).limit(20).all()
-            if pending:
-                import pandas as pd
-                df = pd.DataFrame([
-                    {
-                        "レビューID": r.id,
-                        "入札ID": r.bid_id,
-                        "ステータス": r.status.value if hasattr(r.status, 'value') else r.status,
-                        "作成日時": r.created_at,
-                    }
-                    for r in pending
-                ])
-                st.dataframe(df)
-                with st.form("qa_action"):
-                    rev_id = st.number_input("レビューID", min_value=1, step=1)
-                    action = st.selectbox("アクション", ["承認", "却下"])
-                    notes = st.text_area("メモ / 修正内容 (JSON)", height=150)
-                    if st.form_submit_button("実行"):
-                        if action == "承認":
-                            import json
-                            corrected = {}
-                            if notes:
-                                try:
-                                    corrected = json.loads(notes)
-                                except Exception as e:
-                                    st.error(f"JSON パースエラー: {e}")
-                                    st.stop()
-                            from services.qa_fix_pipeline import apply_fix
-                            try:
-                                apply_fix(session, rev_id, corrected)
-                                st.success(f"レビュー {rev_id} を承認し更新しました")
-                            except Exception as e:
-                                st.error(f"エラー: {e}")
-                        else:
-                            from services.qa_fix_pipeline import reject
-                            try:
-                                reject(session, rev_id, notes or "理由未指定")
-                                st.success(f"レビュー {rev_id} を却下しました")
-                            except Exception as e:
-                                st.error(f"エラー: {e}")
-            else:
-                st.info("保留中の QA レビューはありません")
-        # 品質しきい値設定タブ
-        with tab7:
-            st.subheader("品質しきい値設定")
-            thresholds = session.query(QualityThreshold).all()
-            if thresholds:
-                import pandas as pd
-                df = pd.DataFrame([{
-                    "ID": t.id,
-                    "メトリクス": t.metric_name,
-                    "警告しきい値": t.warn_at,
-                    "アラートしきい値": t.alert_at,
-                } for t in thresholds])
-                st.dataframe(df)
-            else:
-                st.info("しきい値は未設定です。")
-            with st.form("threshold_form"):
-                metric = st.text_input("メトリクス名 (既存は上書き)")
-                warn_val = st.number_input("警告しきい値", step=0.1)
-                alert_val = st.number_input("アラートしきい値", step=0.1)
-                if st.form_submit_button("保存"):
-                    existing = session.query(QualityThreshold).filter_by(metric_name=metric).first()
-                    if existing:
-                        existing.warn_at = warn_val
-                        existing.alert_at = alert_val
-                    else:
-                        new_th = QualityThreshold(metric_name=metric, warn_at=warn_val, alert_at=alert_val)
-                        session.add(new_th)
-                    session.commit()
-                    st.success(f"しきい値を保存しました: {metric}")
-                    st.rerun()
-        """
-app_admin.py — 管理画面
-
-組織・ユーザー・ロールの管理を行う。
-"""
-import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -197,16 +16,18 @@ from database.models.crawl_priority import CrawlPriority
 from database.models.agency_inventory import AgencyInventory
 from database.models.qa_review import QAReview, QAStatusEnum
 from database.models import SystemSetting
-from config import AppConfig
+from config_dir import AppConfig
 from database.models.quality_threshold import QualityThreshold
 from database.models import BackfillJob, BackfillJobStatus, BackfillJobLog, Agency, AgencyCategory
+from database.models.quality_alert import QualityAlert
 from services.backfill_service import BackfillService
+from services.quality_alert_service import QualityAlertService
 
 
 def render():
     st.set_page_config(page_title="管理画面", page_icon="🛠", layout="wide")
     st.title("🛠 システム管理")
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["組織", "ユーザー", "ロール", "優先度マトリクス", "発注機関インベントリ", "人手チェック", "品質しきい値", "システム設定", "バックフィル"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(["組織", "ユーザー", "ロール", "優先度マトリクス", "発注機関インベントリ", "人手チェック", "品質しきい値", "システム設定", "バックフィル", "品質アラート履歴"])
 
     with get_session() as session:
         auth = AuthService(session)
@@ -608,3 +429,65 @@ def render():
                     dedup = BackfillDedupService()
                     result = dedup.merge_duplicates(dry_run=False)
                     st.success(f"修正完了: {result}")
+
+        # 品質アラート履歴タブ
+        with tab10:
+            st.subheader("品質アラート履歴")
+            alert_service = QualityAlertService(session)
+
+            # フィルタ
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                level_filter = st.selectbox("レベル", ["全て", "warn", "alert"])
+            with col2:
+                metric_filter = st.selectbox(
+                    "メトリクス",
+                    ["全て"] + [row[0] for row in session.query(QualityAlert.metric).distinct().all()]
+                )
+            with col3:
+                date_from = st.date_input("期間 (開始)", value=datetime.utcnow().date() - timedelta(days=30))
+            with col4:
+                date_to = st.date_input("期間 (終了)", value=datetime.utcnow().date())
+
+            limit = st.slider("表示件数", 10, 200, 50)
+
+            query_level = None if level_filter == "全て" else level_filter
+            query_metric = None if metric_filter == "全て" else metric_filter
+
+            alerts = alert_service.get_recent_alerts(
+                limit=limit,
+                level=query_level,
+                metric=query_metric,
+                start_date=datetime.combine(date_from, datetime.min.time()),
+                end_date=datetime.combine(date_to, datetime.max.time()),
+            )
+
+            if alerts:
+                df = pd.DataFrame([{
+                    "日時": a.sent_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    "メトリクス": a.metric,
+                    "レベル": "⚠️ 警告" if a.level == "warn" else "🔴 アラート",
+                    "値": a.value,
+                    "しきい値": a.threshold,
+                } for a in alerts])
+                st.dataframe(df, use_container_width=True)
+
+                # 詳細モーダル
+                st.divider()
+                st.subheader("詳細表示")
+                selected_id = st.number_input("アラートIDを選択", min_value=1, step=1)
+                if st.button("詳細表示"):
+                    alert = session.query(QualityAlert).get(selected_id)
+                    if alert:
+                        st.json({
+                            "ID": alert.id,
+                            "メトリクス": alert.metric,
+                            "レベル": alert.level,
+                            "実測値": alert.value,
+                            "しきい値": alert.threshold,
+                            "通知日時": alert.sent_at.strftime("%Y-%m-%d %H:%M:%S"),
+                        })
+                    else:
+                        st.warning("指定されたアラートが見つかりません")
+            else:
+                st.info("条件に一致するアラートがありません")

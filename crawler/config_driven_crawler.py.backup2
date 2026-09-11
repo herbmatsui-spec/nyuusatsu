@@ -1,0 +1,91 @@
+"""設定駆動型クローラ
+ 
+ - `BaseCrawler` を継承し、YAML 設定で対象ページ・パーサー情報を取得
+ - `parse_list` と `parse_detail` は設定に基づく CSS セレクタを使用
+ - 日付範囲指定による絞り込み機能を提供
+"""
+
+import yaml
+from pathlib import Path
+from typing import List, Any, Optional
+from datetime import date
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+
+from crawler.base_crawler import BaseCrawler
+from crawler.utils.date_filter import filter_by_date_range
+from crawler.utils.date_parser import parse_date_string, extract_date_from_text
+
+
+class ConfigDrivenCrawler(BaseCrawler):
+    def __init__(
+        self,
+        config_path: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            start_date=start_date,
+            end_date=end_date,
+            **kwargs,
+        )
+        self.config = self._load_config(config_path)
+        self.list_selector = self.config.get("list_selector")
+        self.detail_selector = self.config.get("detail_selector")
+        self.pagination_selector = self.config.get("pagination_selector")
+        self.base_url = self.config.get("base_url")
+        self.page_format = self.config.get("page_format", "html")
+
+    def _load_config(self, path: str) -> dict:
+        with open(Path(path), "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+            # Ensure detail_fields exists for parsing
+            config.setdefault("detail_fields", {})
+            return config
+
+    def extract_item_date(self, item: Any) -> Optional[date]:
+        """アイテムから日付を抽出
+ 
+        設定ファイルに date_selector が指定されていればそれを使用、
+        なければテキストから抽出を試みる
+        """
+        # 設定に date_selector があれば優先
+        date_selector = self.config.get("date_selector")
+        if date_selector and hasattr(item, "get"):
+            # item が dict の場合
+            if isinstance(item, dict):
+                date_text = item.get("date_text") or item.get("deadline") or item.get("announcement_date")
+                if date_text:
+                    return parse_date_string(str(date_text))
+        return None
+
+    def parse_list(self, html: str) -> List[str]:
+        soup = BeautifulSoup(html, "html.parser")
+        links = []
+        if self.list_selector:
+            for el in soup.select(self.list_selector):
+                href = el.get("href")
+                if href:
+                    links.append(urljoin(self.base_url, href))
+        return links
+    def parse_detail(self, html: str) -> Any:
+        Args:
+            items: List of dictionaries representing items to save
+            repository: Repository object to use for saving (BidRepository or AwardResultRepository)
+        """
+        # Create objects from items and save them using the repository
+        if repository.__class__.__name__ == "BidRepository":
+            # For BidRepository, we need to create Bid objects
+            for item in items:
+                # Create a dictionary with the item data and add any missing fields
+                # This is a simplified example - in practice, we would need to map fields properly
+                bid_obj = repository._map_to_bid_model(item)
+                repository.save_bid(session=repository.get_session(), bid=bid_obj)
+        elif repository.__class__.__name__ == "AwardResultRepository":
+            # For AwardResultRepository, we need to create AwardResult objects
+            for item in items:
+                award_result_obj = repository._map_to_award_result_model(item)
+                repository.save_award_result(session=repository.get_session(), award_result=award_result_obj)
+        else:
+            raise ValueError(f"Unsupported repository type: {repository.__class__.__name__}")

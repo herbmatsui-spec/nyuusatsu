@@ -1,0 +1,82 @@
+selectors_version: "2026.09"
+pages:
+  search_form:
+    query:
+      - 'input[name="query"]'
+      - 'input#query'
+      - 'input[type="search"]'
+      - 'input[placeholder*="検索"]'
+    start_date:
+      - 'input[name="startDate"]'
+      - 'input[name="fromDate"]'
+      - 'input[name="dateFrom"]'
+      - 'input[id*="start"]'
+      - 'input[id*="from"]'
+      - 'input#startDate'
+      - 'input[type="date"]'
+      - 'input[placeholder*="開始"]'
+      - 'input[placeholder*="から"]'
+    end_date:
+      - 'input[name="endDate"]'
+      - 'input[name="toDate"]'
+      - 'input[name="dateTo"]'
+      - 'input[id*="end"]'
+      - 'input[id*="to"]'
+      - 'input#endDate'
+      - 'input[type="date"]'
+      - 'input[placeholder*="終了"]'
+      - 'input[placeholder*="まで"]'
+    submit:
+      - 'button[type="submit"]'
+      - 'input[type="submit"]'
+      - 'button#searchButton'
+  search_results:
+    item:
+      - 'div.search-result-item'
+      - 'div.result-item'
+      - 'tr.result-row'
+      - 'table tr'
+    title:
+      - 'a.title'
+      - 'td.title'
+      - 'a[href]'
+      - 'a.result-title'
+    organization:
+      - 'span.organization'
+      - 'td.organization'
+      - 'td:nth-child(2)'
+      - 'span.result-organization'
+    budget:
+      - 'span.budget'
+      - 'td.budget'
+      - 'td:nth-child(3)'
+      - 'span.result-budget'
+    deadline:
+      - 'span.deadline'
+      - 'td.deadline'
+      - 'td:nth-child(4)'
+      - 'span.result-deadline'
+    pdf_url:
+      - 'a[href$=".pdf"]'
+      - 'a[href*=".pdf"]'
+  detail:
+    title:
+      - 'h1'
+      - '[data-field="title"]'
+      - 'title'
+      - 'h1#detailTitle'
+    organization:
+      - '[data-field="organization"]'
+      - '.organization'
+      - 'th.organization + td'
+      - 'span#detailOrganization'
+    budget:
+      - '[data-field="budget"]'
+      - '.budget'
+      - 'th.budget + td'
+      - 'span#detailBudget'
+    deadline:
+      - '[data-field="deadline"]'
+      - '.deadline'
+      - 'th.deadline + td'
+      - 'span#detailDeadline'

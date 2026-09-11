@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from google import genai
 from urllib.robotparser import RobotFileParser
-from config import AppConfig
+from config_dir import AppConfig
 from utils.logger import setup_logging, get_logger
 from utils.file_cache import is_file_cached, save_to_cache
 from services.pdf_processor import PDFProcessor, PDFExtractionError

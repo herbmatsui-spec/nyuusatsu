@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 import json
@@ -115,7 +115,7 @@ class CrawlScheduler:
             from database.session import get_db
             with get_db() as db:
                 db_source = db.merge(source)
-                db_source.last_crawled_at = datetime.utcnow()
+                db_source.last_crawled_at = datetime.now(timezone.utc)
                 db.add(db_source)
                 db.flush()
         except Exception as e:

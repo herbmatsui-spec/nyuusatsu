@@ -44,10 +44,11 @@ def test_authenticate_failure(db_session):
 def test_has_permission(db_session):
     auth = AuthService(db_session)
     user = auth.create_user("alice", "password")
-    role = Role(name="admin", permissions_json='["bid:read", "bid:write"]')
+    now = datetime.utcnow()
+    role = Role(name="admin", permissions_json='["bid:read", "bid:write"]', created_at=now)
     db_session.add(role)
     db_session.flush()
-    db_session.add(UserRole(user_id=user.id, role_id=role.id))
+    db_session.add(UserRole(user_id=user.id, role_id=role.id, created_at=now))
     db_session.flush()
     assert auth.has_permission(user, "read", "bid") is True
     assert auth.has_permission(user, "write", "bid") is True

@@ -1,7 +1,7 @@
 import redis
 from redis import Redis
 from rq import Queue, Worker
-from config import AppConfig
+from config_dir import AppConfig
 
 class RQConfig:
     """

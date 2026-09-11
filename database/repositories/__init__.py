@@ -39,9 +39,46 @@ class CompanyRegionRankRepository(BaseRepository):
 class BidAssignmentRepository(BaseRepository):
     model = _BidAssignment
 
+    def get_by_bid(self, bid_id: int):
+        """Get all assignments for a specific bid."""
+        return self.session.query(self.model).filter(self.model.bid_id == bid_id).all()
+
 
 class BidRepository(BaseRepository):
     model = _Bid
+
+    def list_all(self, limit: int = None):
+        query = self.session.query(self.model)
+        if limit:
+            query = query.limit(limit)
+        return query.all()
+
+    def upsert_bid(self, bid_data: dict):
+        data = dict(bid_data)
+        bid_id = data.pop("id", None)
+        bid = self.session.get(self.model, bid_id) if bid_id is not None else None
+
+        if bid is None and data.get("source_url"):
+            bid = self.session.query(self.model).filter(
+                self.model.source_url == data["source_url"]
+            ).first()
+
+        if bid is None and data.get("filename"):
+            bid = self.session.query(self.model).filter(
+                self.model.filename == data["filename"]
+            ).first()
+
+        if bid is None:
+            bid = self.model(**data)
+        else:
+            for key, value in data.items():
+                if hasattr(bid, key):
+                    setattr(bid, key, value)
+
+        self.session.add(bid)
+        self.session.commit()
+        self.session.refresh(bid)
+        return bid
 
 
 class PDFRepository(BaseRepository):
@@ -78,9 +115,21 @@ class PartnerRepository(BaseRepository):
 class SavedSearchRepository(BaseRepository):
     model = _SavedSearch
 
+    def get_active_by_user(self, user_id: str):
+        return self.session.query(self.model).filter(
+            self.model.user_id == user_id,
+            self.model.is_active == True
+        ).all()
+
 
 class NotificationChannelRepository(BaseRepository):
     model = _NotificationChannel
+
+    def get_active_by_user(self, user_id: str):
+        return self.session.query(self.model).filter(
+            self.model.user_id == user_id,
+            self.model.is_active == True
+        ).all()
 
 
 class FavoriteRepository(BaseRepository):

@@ -1,0 +1,172 @@
+name: GEPS Live Tests
+
+on:
+  schedule:
+    # 毎週月曜 午前 3:00 (JST) に実行
+    - cron: '0 18 * * 0'  # UTC: 日曜 18:00 = 月曜 3:00 JST
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: '実行するフェーズ範囲 (例: 1-10)'
+        required: false
+        type: string
+      skip_live:
+        description: '本番環境アクセスをスキップ'
+        required: false
+        type: boolean
+        default: false
+      xdist:
+        description: '並列ワーカー数 (auto または数値)'
+        required: false
+        type: string
+        default: 'auto'
+      timeout:
+        description: 'テストタイムアウト秒数'
+        required: false
+        type: string
+        default: '300'
+
+env:
+  GEPS_LIVE_URL: https://www.geps.go.jp
+  GEPS_TEST_TIMEOUT: 300
+  GEPS_SKIP_LIVE: ${{ github.event.inputs.skip_live || 'false' }}
+  # 以下は Secrets で設定が必要
+  DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+  LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+
+jobs:
+  live-tests:
+    name: GEPS Live Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            tesseract-ocr \
+            libtesseract-dev \
+            poppler-utils \
+            fonts-noto-cjk \
+            xvfb
+      
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # テスト用追加依存関係
+          pip install pytest-xdist pytest-timeout pytest-json-report flaky pytest-mock
+      
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+          playwright install-deps chromium
+      
+      - name: Run live tests
+        id: run_tests
+        run: |
+          cd tests/test_geps_live
+          
+          # コマンドライン引数を構築
+          ARGS=()
+          
+          if [[ -n "${{ github.event.inputs.phase }}" ]]; then
+            ARGS+=(--phase "${{ github.event.inputs.phase }}")
+          fi
+          
+          if [[ "${{ github.event.inputs.skip_live }}" == "true" ]]; then
+            ARGS+=(--no-live)
+          fi
+          
+          if [[ -n "${{ github.event.inputs.xdist }}" ]]; then
+            ARGS+=(--xdist "${{ github.event.inputs.xdist }}")
+          fi
+          
+          if [[ -n "${{ github.event.inputs.timeout }}" ]]; then
+            ARGS+=(--timeout "${{ github.event.inputs.timeout }}")
+          fi
+          
+          if [[ -n "${{ secrets.SLACK_WEBHOOK_URL }}" || -n "${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" ]]; then
+            ARGS+=(--notify)
+          fi
+          
+          ARGS+=(--report "live_test_report_${{ github.run_id }}.md")
+          
+          echo "Running: python scripts/run_live_tests.py ${ARGS[@]}"
+          python scripts/run_live_tests.py "${ARGS[@]}"
+          EXIT_CODE=$?
+          
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          # レポートをアップロード用にコピー
+          if [[ -f "live_test_report_${{ github.run_id }}.md" ]]; then
+            cp "live_test_report_${{ github.run_id }}.md" "${{ github.workspace }}/live_test_report.md"
+          fi
+          if [[ -f "live_test_report_${{ github.run_id }}.json" ]]; then
+            cp "live_test_report_${{ github.run_id }}.json" "${{ github.workspace }}/live_test_report.json"
+          fi
+      
+      - name: Upload test report (Markdown)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-test-report-md
+          path: live_test_report.md
+          retention-days: 30
+      
+      - name: Upload test report (JSON)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-test-report-json
+          path: live_test_report.json
+          retention-days: 30
+      
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-test-failures
+          path: |
+            tests/test_geps_live/live_test_*/
+            reports/
+          retention-days: 30
+      
+      - name: Send Slack notification
+        if: always()
+        continue-on-error: true
+        run: |
+          if [[ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]]; then
+            STATUS="成功"
+            if [[ "${{ steps.run_tests.outputs.exit_code }}" != "0" ]]; then
+              STATUS="失敗"
+            fi
+            
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"GEPSライブテスト ${STATUS} - Run #${{ github.run_number }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|詳細を見る>\"}" \
+              "${{ secrets.SLACK_WEBHOOK_URL }}"
+          fi
+      
+      - name: Post summary to GitHub Actions
+        if: always()
+        run: |
+          if [[ -f "live_test_report.md" ]]; then
+            cat live_test_report.md >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Fail job if tests failed
+        if: steps.run_tests.outputs.exit_code != 0
+        run: exit ${{ steps.run_tests.outputs.exit_code }}

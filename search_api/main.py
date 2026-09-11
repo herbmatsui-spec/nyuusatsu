@@ -5,6 +5,9 @@ import uvicorn
 from database.repositories import BidRepository
 from services.bid_service import BidService
 from database.engine import SessionLocal
+from services.qualification_normalizer import QualificationNormalizer
+from services.llm_service import LLMService
+from config import AppConfig
 
 app = FastAPI(title="Bid Search API")
 
@@ -20,6 +23,29 @@ def get_bid_service():
     finally:
         db.close()
 
+# Dependency injection for LLM Service
+def get_llm_service():
+    config = AppConfig()
+    deepseek_key = None
+    gemini_key = None
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        import os
+        deepseek_key = os.environ.get("DEEPSEEK_API_KEY")
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+    except Exception:
+        pass
+    yield LLMService(
+        deepseek_key=deepseek_key,
+        gemini_key=gemini_key,
+        config=config
+    )
+
+# Dependency injection for Qualification Normalizer Service
+def get_qualification_normalizer_service(llm_service: LLMService = Depends(get_llm_service)):
+    yield QualificationNormalizer(llm_service=llm_service)
+
 class BidSearchResponse(BaseModel):
     id: int
     project_name: str
@@ -27,6 +53,12 @@ class BidSearchResponse(BaseModel):
     qualifications: str
     deadline: str
     deliverables: str
+
+class QualificationNormalizeRequest(BaseModel):
+    texts: List[str]
+
+class QualificationNormalizeResponse(BaseModel):
+    results: List[Dict[str, Any]]
 
 @app.get("/search", response_model=List[BidSearchResponse])
 async def search_bids(
@@ -45,6 +77,20 @@ async def search_bids(
     try:
         results = service.get_all_bids(filters)
         return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/qualification/normalize", response_model=QualificationNormalizeResponse)
+async def normalize_qualifications(
+    request: QualificationNormalizeRequest,
+    normalizer: QualificationNormalizer = Depends(get_qualification_normalizer_service)
+):
+    """
+    参加資格テキストリストを正規化タグにマッピングする
+    """
+    try:
+        results = normalizer.normalize(request.texts)
+        return QualificationNormalizeResponse(results=results)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

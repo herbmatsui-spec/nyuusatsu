@@ -2,6 +2,7 @@ import logging
 import requests
 import smtplib
 from collections.abc import Sequence
+from typing import List
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from config import AppConfig

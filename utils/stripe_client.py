@@ -1,7 +1,7 @@
 """Stripe client utilities."""
 import os
 import stripe
-from config import AppConfig
+from config_dir import AppConfig
 
 
 _config = AppConfig()

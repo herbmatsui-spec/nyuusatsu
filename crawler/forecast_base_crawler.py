@@ -7,7 +7,7 @@ from crawler.base_crawler import BaseCrawler
 from crawler.utils.user_agent import get_random_user_agent
 from crawler.utils.proxy_manager import ProxyManager
 from crawler.utils.rate_limiter import RateLimiter
-from config import AppConfig
+from config_dir import AppConfig
 from utils.forecast_logger import ForecastLogger
 
 

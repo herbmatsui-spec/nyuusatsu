@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import logging
 from datetime import datetime
-from config import AppConfig
+from config_dir import AppConfig
 from services.crawl_service import CrawlService
 
 config = AppConfig()

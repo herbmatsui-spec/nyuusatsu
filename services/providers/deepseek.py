@@ -8,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
 import json
 from .base import LLMProvider
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 

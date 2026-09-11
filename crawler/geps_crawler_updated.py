@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 
 from crawler.base_crawler import BaseCrawler
 from crawler.models.crawl_result import CrawlResult
-from config import AppConfig
+from config_dir import AppConfig
 
 class GEPSCrawler(BaseCrawler):
     def __init__(

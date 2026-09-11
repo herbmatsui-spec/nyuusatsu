@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 import requests
 
 from crawler.award_base_crawler import AwardBaseCrawler
-from config import AppConfig
+from config_dir import AppConfig
 
 logger = logging.getLogger(__name__)
 

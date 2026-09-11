@@ -10,7 +10,7 @@ from database.engine import get_session
 from services.forecast_search_service import ForecastSearchService
 from services.forecast_customer_link_service import ForecastCustomerLinkService
 from services.forecast_report_service import ForecastReportService
-from config import AppConfig
+from config_dir import AppConfig
 
 
 def render():

@@ -26,7 +26,14 @@ def db_session():
 
 
 def test_move_card(db_session):
-    bid = Bid(filename="a.pdf", source_url="http://x/1", current_status="未確認")
+    bid = Bid(
+        filename="a.pdf",
+        source_url="http://x/1",
+        current_status="未確認",
+        analyzed_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
     db_session.add(bid)
     db_session.flush()
     service = KanbanService(db_session)
@@ -35,8 +42,22 @@ def test_move_card(db_session):
 
 
 def test_get_board_groups_by_status(db_session):
-    bid1 = Bid(filename="a.pdf", source_url="http://x/1", current_status="未確認")
-    bid2 = Bid(filename="b.pdf", source_url="http://x/2", current_status="検討中")
+    bid1 = Bid(
+        filename="a.pdf",
+        source_url="http://x/1",
+        current_status="未確認",
+        analyzed_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    bid2 = Bid(
+        filename="b.pdf",
+        source_url="http://x/2",
+        current_status="検討中",
+        analyzed_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
     db_session.add_all([bid1, bid2])
     db_session.flush()
     service = KanbanService(db_session)
@@ -46,7 +67,14 @@ def test_get_board_groups_by_status(db_session):
 
 
 def test_assign_and_unassign(db_session):
-    bid = Bid(filename="a.pdf", source_url="http://x/1")
+    bid = Bid(
+        filename="a.pdf",
+        source_url="http://x/1",
+        current_status="未確認",
+        analyzed_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
     db_session.add(bid)
     db_session.flush()
     service = KanbanService(db_session)

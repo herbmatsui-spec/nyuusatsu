@@ -144,7 +144,7 @@ def test_phase1():
 def test_phase2():
     phase("Phase 2: 設定クラス (Step 9-12)")
     from geps_crawler import CrawlerConfig
-    from config import AppConfig
+    from config_dir import AppConfig
 
     def test_crawler_config_defaults():
         config = CrawlerConfig()

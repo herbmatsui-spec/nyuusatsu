@@ -3,7 +3,7 @@ Competitor Dashboard Service
 ダッシュボード向けの競合企業分析データを生成する。
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, select
@@ -126,7 +126,7 @@ class CompetitorDashboardService:
 
     def get_competitor_trend(self, competitor_id: int, months: int = 6) -> List[Dict[str, Any]]:
         """指定競合の月別落札推移を返す。"""
-        cutoff = datetime.utcnow() - timedelta(days=30 * months)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30 * months)
         stmt = (
             select(
                 func.strftime("%Y-%m", AwardResult.award_date).label("month"),

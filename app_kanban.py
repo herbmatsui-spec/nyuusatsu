@@ -8,7 +8,7 @@ import streamlit as st
 from database.engine import get_session
 from services.kanban_service import KanbanService
 from database.repositories.bid_repository import BidRepository
-from config import AppConfig
+from config_dir import AppConfig
 
 
 def render():

@@ -20,7 +20,7 @@ except Exception as e:
     print("✗ geps_crawler import error:", e)
 
 try:
-    from config import AppConfig
+    from config_dir import AppConfig
     print("✓ config imported")
 except Exception as e:
     print("✗ config import error:", e)

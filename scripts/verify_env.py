@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from config import AppConfig
+from config_dir import AppConfig
 
 def verify_env():
     """

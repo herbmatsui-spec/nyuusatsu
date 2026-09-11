@@ -5,8 +5,17 @@
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
+
+import yaml
+
+try:
+    import validators
+except ImportError:
+    validators = None
 
 # テンプレート文字列
 TEMPLATE_CONFIG = """agency_name: {name}
@@ -19,28 +28,64 @@ page_format: "html"
 parser: "html"
 """
 
-TEMPLATE_FETCHER = """{name} クローラ
+TEMPLATE_FETCHER = """# {name} クローラ
 
-- 自動生成された雛形です。必要に応じて実装を追加してください。
+from urllib.parse import urljoin
 
+from bs4 import BeautifulSoup
 from crawler.base_crawler import BaseCrawler
+from crawler.parsers.field_normalizer import TRANSFORM_MAP
+from database.repositories import BidRepository
+from database.session import get_session
 
 class {class_name}(BaseCrawler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.base_url = "{url}"
+        self.list_selector = "{list_selector}"
+        self.detail_selector = "{detail_selector}"
+        self.detail_fields = {detail_fields}
 
     def parse_list(self, html: str):
-        # TODO: implement list parsing (BeautifulSoup)
-        return []
+        soup = BeautifulSoup(html, "html.parser")
+        links = []
+        for element in soup.select(self.list_selector):
+            href = element.get("href")
+            if href:
+                links.append(urljoin(self.base_url, href))
+        return links
 
     def parse_detail(self, html: str):
-        # TODO: implement detail parsing
-        return {}
+        soup = BeautifulSoup(html, "html.parser")
+        detail = soup.select_one(self.detail_selector) if self.detail_selector else None
+        if detail is None:
+            return soup.get_text(separator="\\n", strip=True)
+
+        result = {{}}
+        for field_name, field_config in self.detail_fields.items():
+            selector = field_config.get("selector")
+            attr = field_config.get("attr", "text")
+            transform_name = field_config.get("transform")
+            multiple = field_config.get("multiple", False)
+            elements = soup.select(selector) if multiple else ([element] if (element := soup.select_one(selector)) else [])
+            values = []
+            for element in elements:
+                if attr == "text":
+                    value = element.get_text(strip=True)
+                else:
+                    value = element.get(attr)
+                transform = TRANSFORM_MAP.get(transform_name) if transform_name else None
+                if transform and value is not None:
+                    value = transform(value)
+                values.append(value)
+            result[field_name] = values if multiple else (values[0] if values else None)
+        return result
 
     def save(self, items):
-        # TODO: implement persistence logic
-        print("[SAVE]", items)
+        with get_session() as session:
+            repository = BidRepository(session)
+            for item in items:
+                repository.upsert_bid(item)
 """
 
 def main():
@@ -63,8 +108,20 @@ def main():
     # Write fetcher skeleton
     class_name = f"{args.name.replace(' ', '')}Fetcher"
     fetcher_path = fetcher_dir / f"{safe_name.lower()}_fetcher.py"
+    detail_fields = {
+        "title": {"selector": "h1", "attr": "text"},
+        "budget": {"selector": ".budget", "attr": "text"},
+        "deadline": {"selector": ".deadline", "attr": "text"},
+    }
     with open(fetcher_path, "w", encoding="utf-8") as f:
-        f.write(TEMPLATE_FETCHER.format(name=args.name, class_name=class_name, url=args.url))
+        f.write(TEMPLATE_FETCHER.format(
+            name=args.name,
+            class_name=class_name,
+            url=args.url,
+            list_selector="a.bid-link",
+            detail_selector="div.detail",
+            detail_fields=repr(detail_fields),
+        ))
 
     print(f"Generated config: {config_path}")
     print(f"Generated fetcher: {fetcher_path}")

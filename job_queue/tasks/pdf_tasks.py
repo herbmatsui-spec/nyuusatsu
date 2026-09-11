@@ -4,7 +4,7 @@ from database.session import SessionLocal
 from services.pdf_pipeline import PDFPipeline
 from services.bid_analysis_service import BidAnalysisService
 from services.llm_service import LLMService
-from config import AppConfig
+from config_dir import AppConfig
 
 logger = logging.getLogger(__name__)
 

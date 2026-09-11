@@ -5,7 +5,7 @@ import io
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -93,6 +93,9 @@ class ArchiveService:
             sha256=sha256,
             file_size=len(data),
             is_deleted_external=False,
+            archived_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         self.session.add(archive)
         self.session.flush()
