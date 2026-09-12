@@ -195,25 +195,20 @@ def cleanup_live_test_resources():
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 本番テスト後のクリーンアップを実行")
     # 対外的クリーンアップがある場合ここに追加
 # --------------------------------------------------------------
-# Phase 0: リソースクリーンアップ
+# Step 1: タイムスタンプ付き一時ディレクトリ fixture
 # --------------------------------------------------------------
 
-@pytest.fixture
-def live_test_dir(request, tmp_path):
-    """成功時に削除し、失敗時には保持するテスト単位の一時ディレクトリ"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    worker_id = getattr(request.config, "workerinput", {}).get("workerid", "master")
-    directory = tmp_path / f"live_test_{timestamp}_{worker_id}"
-    directory.mkdir(parents=True, exist_ok=True)
-    request.node._live_test_dir_failed = False
-    request.node._live_test_dir = directory
+@pytest.fixture(scope="session")
+def live_test_dir(tmp_path_factory):
+    """タイムスタンプ付き一時ディレクトリ（成功時は削除、失敗時は保持）"""
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    d = tmp_path_factory.mktemp(f"live_test_{ts}")
+    yield d
 
-    yield directory
-
-    if not getattr(request.node, "_live_test_dir_failed", False):
-        shutil.rmtree(directory, ignore_errors=True)
-    else:
-        print(f"\n[保持] 失敗したテストの一時ディレクトリ: {directory}")
+    # クリーンアップ: 成功時のみ削除、失敗時は残す
+    if not getattr(live_test_dir, "_failed", False):
+        import shutil
+        shutil.rmtree(d, ignore_errors=True)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -222,7 +217,7 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
     if report.failed:
-        item._live_test_dir_failed = True
+        live_test_dir._failed = True
 
 
 # --------------------------------------------------------------

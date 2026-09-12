@@ -50,7 +50,12 @@ def run(date_range=None):
 
         metrics = qms.collect_all_metrics()
         for name, value in metrics.items():
-            metric = QualityMetric(metric_name=name, value=value)
+            metric = QualityMetric(
+                metric_name=name,
+                value=value,
+                period_start=date_start,
+                period_end=date_end,
+            )
             session.add(metric)
 
         session.commit()

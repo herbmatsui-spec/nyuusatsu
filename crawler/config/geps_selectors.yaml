@@ -5,7 +5,6 @@ pages:
       - 'input[name="query"]'
       - 'input#query'
       - 'input[type="search"]'
-      - 'input[placeholder*="検索"]'
     start_date:
       - 'input[name="startDate"]'
       - 'input[name="fromDate"]'
@@ -13,9 +12,6 @@ pages:
       - 'input[id*="start"]'
       - 'input[id*="from"]'
       - 'input#startDate'
-      - 'input[type="date"]'
-      - 'input[placeholder*="開始"]'
-      - 'input[placeholder*="から"]'
     end_date:
       - 'input[name="endDate"]'
       - 'input[name="toDate"]'
@@ -23,9 +19,6 @@ pages:
       - 'input[id*="end"]'
       - 'input[id*="to"]'
       - 'input#endDate'
-      - 'input[type="date"]'
-      - 'input[placeholder*="終了"]'
-      - 'input[placeholder*="まで"]'
     submit:
       - 'button[type="submit"]'
       - 'input[type="submit"]'

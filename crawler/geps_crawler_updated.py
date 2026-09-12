@@ -18,13 +18,20 @@ from config_dir import AppConfig
 
 class GEPSCrawler(BaseCrawler):
     def __init__(
-        self, 
-        delay: float = 5.0, 
-        timeout: int = 60000, 
-        categories: Optional[List[str]] = None, 
-        priority_levels: Optional[List[int]] = None
+        self,
+        delay: float = 5.0,
+        timeout: int = 60000,
+        categories: Optional[List[str]] = None,
+        priority_levels: Optional[List[int]] = None,
     ):
-        super().__init__(delay, timeout, categories, priority_levels)
+        super().__init__(
+            retry=3,
+            timeout=timeout // 1000 if timeout > 1000 else timeout,
+            backoff=0.5,
+            categories=categories,
+            priority_levels=priority_levels,
+            delay=delay,
+        )
         self.search_url = "https://www.geps.go.jp/index.html"
         self.temp_dir = "./temp_pdfs"
 

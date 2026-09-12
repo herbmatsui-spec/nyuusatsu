@@ -86,10 +86,17 @@ class QualityAlertService:
         threshold = self.session.query(QualityThreshold).filter_by(metric_name=metric_name).first()
         if not threshold:
             return "ok"
-        if value >= threshold.alert_at:
-            return "alert"
-        if value >= threshold.warn_at:
-            return "warn"
+        lower_is_worse = getattr(threshold, "lower_is_worse", False)
+        if lower_is_worse:
+            if value <= threshold.alert_at:
+                return "alert"
+            if value <= threshold.warn_at:
+                return "warn"
+        else:
+            if value >= threshold.alert_at:
+                return "alert"
+            if value >= threshold.warn_at:
+                return "warn"
         return "ok"
 
     def _get_threshold_value(self, metric_name: str, level: str) -> float:

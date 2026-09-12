@@ -11,25 +11,18 @@ def mock_session():
 
 
 def make_query_chain(mock_session, total_count, filter_counts):
-    """session.query(Bid) の呼び出しごとに異なるモックを返すヘルパー"""
-    call_count = 0
+    """session.query(Bid) の呼び出しごとに異なるモックを返すヘルパー
 
-    def query_side_effect(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        mock_q = MagicMock()
-        if call_count == 1:
-            # total count
-            mock_q.count.return_value = total_count
-        else:
-            # filtered count - use filter_counts list
-            idx = call_count - 2
-            if idx < len(filter_counts):
-                mock_q.filter.return_value = mock_q
-                mock_q.count.return_value = filter_counts[idx]
-        return mock_q
+    SQL CASE最適化版: with_entities(sum(case(...))).one() がタプルを返す。
+    filter_counts は各フィールドの欠損件数を表す。
+    """
+    base_query = MagicMock()
+    base_query.count.return_value = total_count
 
-    mock_session.query.side_effect = query_side_effect
+    # SQL CASE最適化: with_entities(...).one() がタプル（各フィールドの欠損数）を返す
+    base_query.with_entities.return_value.one.return_value = tuple(filter_counts)
+
+    mock_session.query.return_value = base_query
 
 
 def test_count_missing_fields(mock_session):
@@ -101,10 +94,28 @@ def test_missing_field_rate_no_data(mock_session):
 
 
 def test_count_duplicates(mock_session):
-    """bid_number重複カウントが正しく返されること"""
+    """source_url の重複件数が正しくカウントされること"""
     service = QualityMetricsService(mock_session)
-    service.count_duplicates = MagicMock(return_value=6)
-    
+
+    mock_query = MagicMock()
+    mock_session.query.return_value = mock_query
+
+    mock_subquery = MagicMock()
+    mock_subq_query = MagicMock()
+    mock_query.with_entities.return_value.group_by.return_value.having.return_value.subquery.return_value = mock_subquery
+    mock_session.query.return_value = mock_subq_query
+
+    call_count = [0]
+    def bid_query_side_effect():
+        call_count[0] += 1
+        return mock_query if call_count[0] == 1 else mock_query
+    service._bid_query = MagicMock(side_effect=bid_query_side_effect)
+
+    mock_query.with_entities.return_value.group_by.return_value.having.return_value.subquery.return_value = mock_subquery
+    mock_session.query.return_value = mock_subq_query
+    mock_query.filter.return_value = mock_query
+    mock_query.count.return_value = 6
+
     result = service.count_duplicates()
 
     assert result == 6
@@ -136,27 +147,19 @@ def test_duplicate_rate_no_data(mock_session):
 
 
 def test_acquisition_delay_median(mock_session):
-    """取得遅延中央値が正しく計算されること"""
+    """取得遅延中央値が正しく計算されること（奇数件数）"""
     service = QualityMetricsService(mock_session)
-    ann = datetime(2026, 1, 1, 0, 0, 0)
-    created1 = datetime(2026, 1, 1, 0, 10, 0)
-    created2 = datetime(2026, 1, 1, 0, 20, 0)
-    created3 = datetime(2026, 1, 1, 0, 30, 0)
 
-    mock_bid1 = MagicMock()
-    mock_bid1.announcement_date = ann
-    mock_bid1.created_at = created1
-    mock_bid2 = MagicMock()
-    mock_bid2.announcement_date = ann
-    mock_bid2.created_at = created2
-    mock_bid3 = MagicMock()
-    mock_bid3.announcement_date = ann
-    mock_bid3.created_at = created3
-
-    mock_bid_query = MagicMock()
-    mock_session.query.return_value = mock_bid_query
-    mock_bid_query.filter.return_value = mock_bid_query
-    mock_bid_query.all.return_value = [mock_bid1, mock_bid2, mock_bid3]
+    mock_query = MagicMock()
+    service._bid_query = MagicMock(return_value=mock_query)
+    mock_query.filter.return_value = mock_query
+    # total = 3 (odd), mid = 1
+    mock_query.count.return_value = 3
+    mock_query.order_by.return_value = mock_query
+    mock_query.with_entities.return_value = mock_query
+    mock_query.limit.return_value = mock_query
+    mock_query.offset.return_value = mock_query
+    mock_query.scalar.return_value = 20.0
 
     result = service.acquisition_delay_median()
 
@@ -166,21 +169,17 @@ def test_acquisition_delay_median(mock_session):
 def test_acquisition_delay_median_even_count(mock_session):
     """偶数件数の場合の中央値計算"""
     service = QualityMetricsService(mock_session)
-    ann = datetime(2026, 1, 1, 0, 0, 0)
-    created1 = datetime(2026, 1, 1, 0, 10, 0)
-    created2 = datetime(2026, 1, 1, 0, 20, 0)
 
-    mock_bid1 = MagicMock()
-    mock_bid1.announcement_date = ann
-    mock_bid1.created_at = created1
-    mock_bid2 = MagicMock()
-    mock_bid2.announcement_date = ann
-    mock_bid2.created_at = created2
-
-    mock_bid_query = MagicMock()
-    mock_session.query.return_value = mock_bid_query
-    mock_bid_query.filter.return_value = mock_bid_query
-    mock_bid_query.all.return_value = [mock_bid1, mock_bid2]
+    mock_query = MagicMock()
+    service._bid_query = MagicMock(return_value=mock_query)
+    mock_query.filter.return_value = mock_query
+    # total = 2 (even), mid = 1, offset = 0
+    mock_query.count.return_value = 2
+    mock_query.order_by.return_value = mock_query
+    mock_query.limit.return_value = mock_query
+    mock_query.offset.return_value = mock_query
+    mock_query.with_entities.return_value = mock_query
+    mock_query.all.return_value = [10.0, 20.0]
 
     result = service.acquisition_delay_median()
 
@@ -190,10 +189,11 @@ def test_acquisition_delay_median_even_count(mock_session):
 def test_acquisition_delay_median_no_data(mock_session):
     """データがない場合は0.0が返されること"""
     service = QualityMetricsService(mock_session)
-    mock_bid_query = MagicMock()
-    mock_session.query.return_value = mock_bid_query
-    mock_bid_query.filter.return_value = mock_bid_query
-    mock_bid_query.all.return_value = []
+
+    mock_query = MagicMock()
+    service._bid_query = MagicMock(return_value=mock_query)
+    mock_query.filter.return_value = mock_query
+    mock_query.count.return_value = 0
 
     result = service.acquisition_delay_median()
 
@@ -203,21 +203,18 @@ def test_acquisition_delay_median_no_data(mock_session):
 def test_acquisition_delay_median_negative_delay_excluded(mock_session):
     """負の遅延（DB登録が公開日より前）は除外されること"""
     service = QualityMetricsService(mock_session)
-    ann = datetime(2026, 1, 1, 0, 0, 0)
-    created_before = datetime(2025, 12, 31, 23, 50, 0)
-    created_after = datetime(2026, 1, 1, 0, 10, 0)
 
-    mock_bid1 = MagicMock()
-    mock_bid1.announcement_date = ann
-    mock_bid1.created_at = created_before
-    mock_bid2 = MagicMock()
-    mock_bid2.announcement_date = ann
-    mock_bid2.created_at = created_after
-
-    mock_bid_query = MagicMock()
-    mock_session.query.return_value = mock_bid_query
-    mock_bid_query.filter.return_value = mock_bid_query
-    mock_bid_query.all.return_value = [mock_bid1, mock_bid2]
+    mock_query = MagicMock()
+    service._bid_query = MagicMock(return_value=mock_query)
+    mock_query.filter.return_value = mock_query
+    # SQL フィルターで delay >= 0 が適用されているため、負の遅延は既に除外済
+    # total = 1 (only the 10-min delay row)
+    mock_query.count.return_value = 1
+    mock_query.order_by.return_value = mock_query
+    mock_query.limit.return_value = mock_query
+    mock_query.offset.return_value = mock_query
+    mock_query.with_entities.return_value = mock_query
+    mock_query.scalar.return_value = 10.0
 
     result = service.acquisition_delay_median()
 
@@ -304,6 +301,8 @@ def test_collect_all_metrics(mock_session):
     service.count_missing_fields = MagicMock(return_value={"organization_name": 5, "budget": 3})
     service.count_duplicates = MagicMock(return_value=20)
     service.daily_delta = MagicMock(return_value={"new": 100, "updated": 50})
+    service.geps_crawler_success_rate = MagicMock(return_value=95.0)
+    service.geps_selector_match_rate = MagicMock(return_value=98.0)
 
     result = service.collect_all_metrics()
 
@@ -313,6 +312,8 @@ def test_collect_all_metrics(mock_session):
         "acquisition_delay_median": 30.0,
         "coverage_rate": 50.0,
         "coverage_municipality_rate": 60.0,
+        "geps_crawler_success_rate": 95.0,
+        "geps_selector_match_rate": 98.0,
         "missing_organization_name": 5,
         "missing_budget": 3,
         "duplicate_count": 20,
@@ -349,11 +350,21 @@ def test_required_fields_constant():
     assert REQUIRED_FIELDS == expected_fields
 
 
-def test_count_duplicates_uses_bid_number(mock_session):
-    """count_duplicates が bid_number で重複判定することを確認"""
-    service = QualityMetricsService(mock_session)
-    service.count_duplicates = MagicMock(return_value=3)
-    
-    result = service.count_duplicates()
+def test_count_duplicates_uses_source_url():
+    """count_duplicates が source_url で重複判定することを確認"""
+    from unittest.mock import MagicMock
+    from services.quality_metrics_service import QualityMetricsService
+    from database.models import Bid
+    from sqlalchemy import func
 
+    mock_session = MagicMock()
+    service = QualityMetricsService(mock_session)
+    service._bid_query = MagicMock(return_value=mock_session.query.return_value)
+
+    mock_subquery = MagicMock()
+    mock_session.query.return_value.with_entities.return_value.group_by.return_value.having.return_value.subquery.return_value = mock_subquery
+    mock_session.query.return_value.filter.return_value = mock_session.query.return_value
+    mock_session.query.return_value.count.return_value = 3
+
+    result = service.count_duplicates()
     assert result == 3

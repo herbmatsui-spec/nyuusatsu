@@ -54,6 +54,7 @@ from .quality_alert import QualityAlert as QualityAlert
 from .quality_metric import Base as QualityMetricBase
 from .quality_threshold import Base as QualityThresholdBase
 from .quality_alert import Base as QualityAlertBase
+from .crawler_schedule import CrawlerSchedule as CrawlerSchedule
 
 _quality_bases = (QualityMetricBase, QualityThresholdBase, QualityAlertBase)
 

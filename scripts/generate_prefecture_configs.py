@@ -10,7 +10,7 @@ def main():
     """
     loader = PrefectureTemplateLoader()
     logger.info("Starting generation of prefecture configs from template...")
-    loader.generate_all_configs()
+    loader.generate_all_configs(output_dir="crawler/parsers/agency_config/prefectures")
     logger.info("All prefecture configs have been generated successfully.")
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from datetime import date
 from crawler.base_crawler import BaseCrawler
 from crawler.models.crawl_result import CrawlResult
@@ -16,17 +16,20 @@ class GenericCrawler(BaseCrawler):
         timeout: int = 60000,
         max_depth: int = 2,
         categories: Optional[List[str]] = None,
-        priority_levels: Optional[List[int]] = None,
+        priority_levels: Optional[List[Union[str, int]]] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ):
-        # BaseCrawlerに日付範囲を渡す
+        # BaseCrawlerに日付範囲・カテゴリ・優先度を渡す
         super().__init__(
             retry=3,
             timeout=timeout // 1000 if timeout > 1000 else timeout,  # ms -> s
             backoff=0.5,
             start_date=start_date,
             end_date=end_date,
+            categories=categories,
+            priority_levels=priority_levels,
+            delay=delay,
         )
         self.parser_type = parser_type
         self.max_depth = max_depth

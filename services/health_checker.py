@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 
 from database.session import get_db
 from database.models.pipeline_metric import PipelineMetric
+from sqlalchemy import text
 
 logger = logging.getLogger("HealthChecker")
 
@@ -90,7 +91,7 @@ class HealthChecker:
         try:
             with get_db() as session:
                 # 簡易クエリ実行
-                session.execute("SELECT 1").first()
+                session.execute(text("SELECT 1")).first()
                 return ComponentHealth("Database", HealthStatus.HEALTHY)
         except Exception as e:
             logger.error(f"Database health check failed: {e}")

@@ -6,12 +6,13 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from urllib.parse import urljoin, urlparse
 
-import yaml
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
 from crawler.base_crawler import BaseCrawler
 from crawler.utils.date_parser import parse_date_string
 from crawler.utils.date_filter import filter_by_date_range
+from crawler.utils.selector_loader import load_selectors as _load_selectors_config
+from crawler.utils.date_field_detector import detect_date_field
 
 logger = logging.getLogger(__name__)
 DEFAULT_SELECTOR_CONFIG = Path(__file__).parent / "config" / "geps_selectors.yaml"
@@ -48,18 +49,8 @@ class GEPSCrawler(BaseCrawler):
         self.selectors = self._load_selectors()
 
     def _load_selectors(self, page_type: Optional[str] = None) -> dict[str, Any]:
-        with self.selectors_path.open(encoding="utf-8") as selector_file:
-            config = yaml.safe_load(selector_file) or {}
-        version = config.get("selectors_version")
-        if not version:
-            raise ValueError(f"Selector version is missing: {self.selectors_path}")
-        if self.selectors_version and str(version) != str(self.selectors_version):
-            raise ValueError(
-                f"Selector version mismatch: expected {self.selectors_version}, got {version}"
-            )
-        if page_type:
-            return config.get("pages", {}).get(page_type, {})
-        return config
+        # Step 17: セレクタロードを crawler/utils/selector_loader.py へ集約
+        return _load_selectors_config(self.selectors_path, self.selectors_version, page_type)
 
     @staticmethod
     def _selector_candidates(value: Any) -> list[str]:
@@ -112,29 +103,9 @@ class GEPSCrawler(BaseCrawler):
         return None
 
     async def _find_date_field(self, page: Page, purpose: str):
+        # Step 22: 検出ロジックを crawler/utils/date_field_detector.py へ抽出
         configured = self.selectors.get("pages", {}).get("search_form", {}).get(purpose, [])
-        element = await self._query_selector(page, configured)
-        if element:
-            return element
-        heuristic = [
-            'input[type="date"]',
-            'input.datepicker',
-            'input[class*="datepicker"]',
-            'input[id*="date" i]',
-            'input[name*="date" i]',
-            'input[placeholder*="日付" i]',
-        ]
-        elements = []
-        for selector in heuristic:
-            try:
-                elements = await page.query_selector_all(selector)
-            except Exception:
-                continue
-            if elements:
-                break
-        if not elements:
-            return None
-        return elements[-1] if purpose == "end_date" else elements[0]
+        return await detect_date_field(page, configured, purpose)
 
     async def _wait_for_results(self, page: Page):
         selectors = self.selectors.get("pages", {}).get("search_results", {}).get("item", [])
@@ -224,7 +195,7 @@ class GEPSCrawler(BaseCrawler):
                     results,
                     self.start_date,
                     self.end_date,
-                    self._extract_item_date,
+                    self.extract_item_date,
                 )
                 if len(filtered) != len(results):
                     logger.info(f"GEPS date filter: {len(results)} -> {len(filtered)} items")
@@ -257,7 +228,7 @@ class GEPSCrawler(BaseCrawler):
         except Exception as e:
             logger.warning(f"Failed to set date range on GEPS form: {e}")
 
-    def _extract_item_date(self, item: Dict[str, Any]) -> Optional[date]:
+    def extract_item_date(self, item: Dict[str, Any]) -> Optional[date]:
         """検索結果アイテムから日付を抽出
 
         優先順位:

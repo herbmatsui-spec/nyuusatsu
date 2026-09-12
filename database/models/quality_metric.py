@@ -11,3 +11,5 @@ class QualityMetric(Base):
     metric_name = Column(String(100), nullable=False)
     value = Column(Float, nullable=False)
     recorded_at = Column(DateTime, default=datetime.utcnow)
+    period_start = Column(DateTime, nullable=True)
+    period_end = Column(DateTime, nullable=True)

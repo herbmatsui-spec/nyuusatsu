@@ -35,6 +35,7 @@ def seed_quality_thresholds(path: str | Path = DEFAULT_PATH) -> int:
                     metric_name=metric_name,
                     warn_at=float(warn_at),
                     alert_at=float(alert_at),
+                    lower_is_worse=bool(values.get("lower_is_worse", False)),
                 )
             )
             inserted += 1

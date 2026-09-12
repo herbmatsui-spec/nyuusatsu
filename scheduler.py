@@ -7,14 +7,16 @@ from crawler_task import execute_crawl
 from services.url_monitor_task import run_url_monitor
 from services.award_crawl_task import run_award_crawl
 from scheduler_jobs.forecast_crawl_job import crawl_all_forecasts
-from db_manager import DB_PATH
+from database.engine import DATABASE_URL
 from utils.notifier import Notifier
 from database.session import get_db
 from database.models.crawl_config import CrawlConfig
 from crawler.pipeline import trigger_agency_crawl
 
+logger = logging.getLogger(__name__)
+
 jobstores = {
-    'default': SQLAlchemyJobStore(url=f"sqlite:///{DB_PATH}")
+    'default': SQLAlchemyJobStore(url=DATABASE_URL)
 }
 
 notifier = Notifier()

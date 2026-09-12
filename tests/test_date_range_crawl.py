@@ -19,6 +19,9 @@ class MockCrawler(BaseCrawler):
     def save(self, items: list):
         pass
 
+    def extract_item_date(self, item):
+        return None
+
 
 class TestDateParser:
     """日付パース機能のテスト"""

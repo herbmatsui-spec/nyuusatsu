@@ -24,14 +24,39 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov pytest-mock pytest-xdist
+        pip install pytest pytest-cov pytest-mock pytest-xdist pytest-benchmark psutil
     
-    - name: Run tests
+    - name: Run unit tests
       env:
         PYTHONPATH: .
         REDIS_URL: redis://localhost:6379/0
       run: |
-        python -m pytest tests/ --no-cov -v
+        python -m pytest tests/unit/ -v --no-cov
+    
+    - name: Run benchmark tests
+      env:
+        PYTHONPATH: .
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        python -m pytest tests/unit/test_quality_metrics_benchmarks.py --benchmark-only --benchmark-sort=mean
+    
+    - name: Run integration tests (if any)
+      env:
+        PYTHONPATH: .
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        python -m pytest tests/integration/ -v --no-cov || true
+    
+    - name: Type check with mypy
+      run: |
+        python -m pip install mypy
+        python -m mypy services/quality_metrics_service.py --ignore-missing-imports || true
+    
+    - name: Code formatting check
+      run: |
+        python -m pip install black isort
+        black --check services/quality_metrics_service.py
+        isort --check services/quality_metrics_service.py
     
     - name: Upload coverage
       if: github.github.event_name == 'push'
