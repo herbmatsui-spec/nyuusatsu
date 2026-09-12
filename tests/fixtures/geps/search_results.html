@@ -1,28 +1,36 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-<head><title>GEPS 検索結果</title></head>
+<head>
+    <title>GEPS Search Result Fixture</title>
+</head>
 <body>
-  <form id="searchForm">
-    <input name="query" value="システム">
-    <input name="startDate" type="date" value="2026-01-01">
-    <input name="endDate" type="date" value="2026-01-31">
-    <button type="submit">検索</button>
-  </form>
-  <main>
-    <div class="search-result-item" data-bid="GEPS-2026-001">
-      <a class="title" href="/detail/001">クラウド基盤整備業務</a>
-      <span class="organization">デジタル庁</span>
-      <span class="budget">12,000,000円</span>
-      <span class="deadline">2026-02-15</span>
-      <a href="/docs/001.pdf">仕様書 PDF</a>
+    <div class="search-result-item">
+        <a class="title" href="/detail/123">テスト入札情報</a>
+        <span class="organization">テスト組織</span>
+        <span class="budget">1,000,000円</span>
+        <span class="deadline">2026-12-31</span>
+        <a class="pdf-url" href="/files/123.pdf">PDFダウンロード</a>
     </div>
-    <div class="search-result-item" data-bid="GEPS-2026-002">
-      <a class="title" href="/detail/0002">セキュリティ診断委託</a>
-      <span class="organization">総務省</span>
-      <span class="budget">8,500,000円</span>
-      <span class="deadline">2026-02-28</span>
-      <a href="/docs/002.pdf">仕様書 PDF</a>
+    <div class="result-item">
+        <a class="result-title" href="/detail/456">もう一つの入札</a>
+        <span class="result-organization">サンプル会社</span>
+        <span class="result-budget">500,000円</span>
+        <span class="result-deadline">2026-11-30</span>
+        <a class="result-pdf" href="/files/456.pdf">PDFダウンロード</a>
     </div>
-  </main>
+    <table>
+        <tr class="result-row">
+            <td class="title"><a href="/detail/789">テーブル形式の入札</a></td>
+            <td class="organization">テーブル組織</td>
+            <td class="budget">750,000円</td>
+            <td class="deadline">2026-10-15</td>
+            <td><a href="/files/789.pdf">PDF</a></td>
+        </tr>
+    </table>
+    <!-- Input fields for search form -->
+    <input type="text" name="query" placeholder="キーワード検索">
+    <input type="date" name="startDate" value="2026-01-01">
+    <input type="date" name="endDate" value="2026-12-31">
+    <button type="submit" id="searchButton">検索</button>
 </body>
 </html>
