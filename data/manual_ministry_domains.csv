@@ -1,0 +1,14 @@
+agency_name,base_url,note
+総務省,https://www.soumu.go.jp/,manual
+法務省,https://www.moj.go.jp/,manual
+外務省,https://www.mofa.go.jp/,manual
+財務省,https://www.mof.go.jp/,manual
+文部科学省,https://www.mext.go.jp/,manual
+厚生労働省,https://www.mhlw.go.jp/,manual
+農林水産省,https://www.maff.go.jp/,manual
+経済産業省,https://www.meti.go.jp/,manual
+国土交通省,https://www.mlit.go.jp/,manual
+環境省,https://www.env.go.jp/,manual
+防衛省,https://www.mod.go.jp/,manual
+内閣府,https://www.cao.go.jp/,manual
+復興庁,https://www.reconstruction.go.jp/,manual
