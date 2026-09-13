@@ -74,7 +74,7 @@ class TestAlertManager:
 class TestSendAlerts:
     """アラート送信関数のテスト。"""
 
-    @patch("services.alert_manager.SlackNotificationService")
+    @patch("notifier.SlackNotificationService")
     def test_send_slack_alert(self, mock_slack_class):
         mock_service = MagicMock()
         mock_service.webhook_url = "https://hooks.slack.com/xxx"
@@ -86,7 +86,7 @@ class TestSendAlerts:
         assert result is True
         mock_service.send.assert_called_once_with("Test message")
 
-    @patch("services.alert_manager.SlackNotificationService")
+    @patch("notifier.SlackNotificationService")
     def test_send_slack_alert_not_configured(self, mock_slack_class):
         mock_service = MagicMock()
         mock_service.webhook_url = None
@@ -95,7 +95,7 @@ class TestSendAlerts:
         result = send_slack_alert("Test message")
         assert result is False
 
-    @patch("services.alert_manager.SlackNotificationService")
+    @patch("notifier.SlackNotificationService")
     def test_send_slack_alert_failure(self, mock_slack_class):
         mock_service = MagicMock()
         mock_service.webhook_url = "https://hooks.slack.com/xxx"
@@ -105,7 +105,7 @@ class TestSendAlerts:
         result = send_slack_alert("Test message")
         assert result is False
 
-    @patch("services.alert_manager.LineNotificationService")
+    @patch("notifier.LineNotificationService")
     def test_send_line_alert(self, mock_line_class):
         mock_service = MagicMock()
         mock_service.access_token = "token"
@@ -116,7 +116,7 @@ class TestSendAlerts:
         result = send_line_alert("Test message")
         assert result is True
 
-    @patch("services.alert_manager.LineNotificationService")
+    @patch("notifier.LineNotificationService")
     def test_send_line_alert_not_configured(self, mock_line_class):
         mock_service = MagicMock()
         mock_service.access_token = None
@@ -125,7 +125,7 @@ class TestSendAlerts:
         result = send_line_alert("Test message")
         assert result is False
 
-    @patch("services.alert_manager.LineNotificationService")
+    @patch("notifier.LineNotificationService")
     def test_send_line_alert_failure(self, mock_line_class):
         mock_service = MagicMock()
         mock_service.access_token = "token"

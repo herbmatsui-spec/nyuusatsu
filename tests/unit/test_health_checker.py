@@ -371,7 +371,7 @@ class TestHealthChecker:
         
         assert result["overall_status"] == "unhealthy"
 
-@patch.object(HealthChecker, "check_redis")
+    @patch.object(HealthChecker, "check_redis")
     @patch.object(HealthChecker, "check_queue_depth")
     @patch.object(HealthChecker, "check_database")
     @patch.object(HealthChecker, "check_scheduler")
