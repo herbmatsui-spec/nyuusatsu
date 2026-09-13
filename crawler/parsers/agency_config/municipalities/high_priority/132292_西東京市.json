@@ -1,0 +1,31 @@
+{
+  "西東京市": {
+    "municipality_code": "132292",
+    "name": "西東京市",
+    "enabled": true,
+    "entry_url": "https://www.city.nishitokyo.lg.jp/",
+    "url_includes": [
+      "/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告",
+      "調達",
+      "競争"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "high_priority",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase"
+    ]
+  }
+}

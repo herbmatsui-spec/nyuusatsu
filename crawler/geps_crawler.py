@@ -8,7 +8,7 @@ from urllib.parse import urljoin, urlparse
 
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
-from crawler.base_crawler import BaseCrawler
+from crawler.async_base_crawler import BaseCrawler
 from crawler.utils.date_parser import parse_date_string
 from crawler.utils.date_filter import filter_by_date_range
 from crawler.utils.selector_loader import load_selectors as _load_selectors_config
@@ -32,15 +32,18 @@ class GEPSCrawler(BaseCrawler):
         selectors_path: Optional[Path | str] = None,
         selectors_version: Optional[str] = None,
     ):
+        # Convert Playwright timeout (ms) to aiohttp timeout (s)
+        aiohttp_timeout = timeout // 1000 if timeout > 1000 else timeout
         super().__init__(
             retry=3,
-            timeout=timeout // 1000 if timeout > 1000 else timeout,
+            timeout=aiohttp_timeout,
             backoff=0.5,
             start_date=start_date,
             end_date=end_date,
+            delay=delay,
+            rate_limit=2.0,
         )
-        self.delay = delay
-        self.timeout = timeout
+        self.playwright_timeout = timeout
         self.playwright = None
         self.browser = None
         self.context = None

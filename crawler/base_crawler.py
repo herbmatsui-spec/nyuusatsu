@@ -4,20 +4,27 @@
 - `parse_list` と `parse_detail` は子クラスで実装する抽象メソッド
 - 日付範囲指定による絞り込み機能を提供
 - agency の category_id と priority_level でフィルタリング可能
+- レート制限、プロキシ、リトライ（ジッター付きバックオフ）をサポート
 """
 
 import time
+import random
 import logging
 from abc import ABC, abstractmethod
 from typing import List, Any, Optional, Union
 from datetime import date, datetime
 
 import requests
+import random
 from sqlalchemy.orm import Session
 from bs4 import BeautifulSoup
+from crawler.exceptions import CrawlError, ParseError, RateLimitError
 
 # Automatic selector detection imports
 from crawler.parsers.structure_detector import StructureDetector
+# Rate limiting and proxy imports
+from crawler.utils.rate_limiter import RateLimiter
+from crawler.utils.proxy_manager import ProxyManager
 from crawler.parsers.selector_generator import SelectorGenerator
 from crawler.parsers.fallback_selector import FallbackSelector
 from crawler.parsers.structure_change_detector import StructureChangeDetector
@@ -33,12 +40,18 @@ class BaseCrawler(ABC):
         retry: int = 3,
         timeout: int = 15,
         backoff: float = 0.5,
+        backoff_jitter: float = 0.1,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         use_auto_selector: bool = False,
         categories: Optional[List[str]] = None,
         priority_levels: Optional[List[Union[str, int]]] = None,
         delay: float = 0.0,
+        # Rate limiting
+        rate_limit: Optional[float] = None,
+        # Proxy
+        proxy: Optional[str] = None,
+        proxy_manager: Optional[ProxyManager] = None,
     ):
         """BaseCrawler のコンストラクタ。
 
@@ -46,6 +59,7 @@ class BaseCrawler(ABC):
             retry: リトライ回数
             timeout: HTTP タイムアウト秒数
             backoff: リトライ時のベースバックオフ秒数
+            backoff_jitter: バックオフに加えるジッター（秒）。0 の場合はジッターなし。
             start_date: クロール開始日（フィルタリング用）
             end_date: クロール終了日（フィルタリング用）
             use_auto_selector: 自動セレクタ検出機能のフラグ
@@ -55,10 +69,14 @@ class BaseCrawler(ABC):
                              日本語文字（'高'/'中'/'低'）または整数（0/1/2）指定可能。
                              None の場合はすべての優先度が対象。
             delay: クローリング間の遅延秒数
+            rate_limit: リクエスト間隔の最小秒数（レート制限）。None の場合は制限なし。
+            proxy: 使用するプロキシURL。None の場合は ProxyManager から取得。
+            proxy_manager: ProxyManager インスタンス。None の場合は自動作成。
         """
         self.retry = retry
         self.timeout = timeout
         self.backoff = backoff
+        self.backoff_jitter = backoff_jitter
         self.start_date = start_date
         self.end_date = end_date
         self.use_auto_selector = use_auto_selector
@@ -72,6 +90,13 @@ class BaseCrawler(ABC):
         self.priority_levels = priority_levels
         self.delay = delay
         self.logger = logging.getLogger(self.__class__.__name__)
+
+        # Rate limiting
+        self._rate_limiter = RateLimiter(rate_limit) if rate_limit else None
+
+        # Proxy
+        self._proxy = proxy
+        self._proxy_manager = proxy_manager or ProxyManager()
 
     def _resolve_priority_levels(self) -> List[int]:
         """priority_levels 内の日本語文字を整数に変換して返す。
@@ -134,20 +159,60 @@ class BaseCrawler(ABC):
 
         return agencies
 
-    # 将来的に非同期版も追加予定: async def async_fetch(self, url: str) -> str:
+# 将来的に非同期版も追加予定: async def async_fetch(self, url: str) -> str:
     def fetch(self, url: str) -> str:
-        """HTTP GET with simple exponential backoff retry"""
-        # TODO: 将来的にここを非同期HTTPクライアントに置き換える
+        """HTTP GET with exponential backoff retry, rate limiting, and proxy support."""
+        import random
         attempt = 0
         while attempt < self.retry:
             try:
-                resp = requests.get(url, timeout=self.timeout)
+                # Rate limiting
+                self._rate_limiter.throttle_sync(url)
+                # Proxy
+                proxy = self._proxy_manager.get_next_proxy()
+                proxies = {"http": proxy, "https": proxy} if proxy else None
+                resp = requests.get(url, timeout=self.timeout, proxies=proxies)
+                # Detect rate limit status code 429
+                if resp.status_code == 429:
+                    raise RateLimitError(f"Rate limit exceeded for {url}")
                 resp.raise_for_status()
                 return resp.text
+            except RateLimitError as e:
+                logger.warning(f"Rate limit error for {url}, attempt {attempt + 1}/{self.retry}")
+                attempt += 1
+                if attempt < self.retry:
+                    jitter = random.uniform(0, self.backoff * attempt)
+                    wait_time = self.backoff * (2 ** attempt) + jitter
+                    time.sleep(wait_time)
+                else:
+                    raise
+            except requests.exceptions.HTTPError as e:
+                logger.warning(f"HTTP error {e} for {url}, attempt {attempt + 1}/{self.retry}")
+                attempt += 1
+                if attempt < self.retry:
+                    jitter = random.uniform(0, self.backoff * attempt)
+                    wait_time = self.backoff * (2 ** attempt) + jitter
+                    time.sleep(wait_time)
+                else:
+                    raise CrawlError(f"HTTP error {e}") from e
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                logger.warning(f"Connection error {e} for {url}, attempt {attempt + 1}/{self.retry}")
+                attempt += 1
+                if attempt < self.retry:
+                    jitter = random.uniform(0, self.backoff * attempt)
+                    wait_time = self.backoff * (2 ** attempt) + jitter
+                    time.sleep(wait_time)
+                else:
+                    raise CrawlError(f"Connection error {e}") from e
             except Exception as e:
                 logger.warning(f"Fetch error {e} for {url}, attempt {attempt + 1}/{self.retry}")
                 attempt += 1
-                time.sleep(self.backoff * (2 ** attempt))
+                if attempt < self.retry:
+                    jitter = random.uniform(0, self.backoff * attempt)
+                    wait_time = self.backoff * (2 ** attempt) + jitter
+                    time.sleep(wait_time)
+                else:
+                    raise CrawlError(f"Unexpected error {e}") from e
         raise RuntimeError(f"Failed to fetch {url} after {self.retry} attempts")
 
     def _auto_select_elements(self, html: str, fallback_selectors: Optional[List[str]] = None) -> List:

@@ -20,11 +20,17 @@ try:
 except Exception as e:
     logger.warning(f"Redis connection failed (queues disabled): {e}")
 
-# RQ キューの初期化
-crawl_queue = Queue("crawl_tasks", connection=redis_conn)
-download_queue = Queue("download_tasks", connection=redis_conn)
-analysis_queue = Queue("analysis_tasks", connection=redis_conn)
-notification_queue = Queue("notification_tasks", connection=redis_conn)
+# RQ キューの初期化 (Redis 未接続時は None にフォールバック)
+if redis_conn:
+    crawl_queue = Queue("crawl_tasks", connection=redis_conn)
+    download_queue = Queue("download_tasks", connection=redis_conn)
+    analysis_queue = Queue("analysis_tasks", connection=redis_conn)
+    notification_queue = Queue("notification_tasks", connection=redis_conn)
+else:
+    crawl_queue = None
+    download_queue = None
+    analysis_queue = None
+    notification_queue = None
 
 
 # -----------------------------------------------------------------------------

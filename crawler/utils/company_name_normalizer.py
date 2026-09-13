@@ -3,6 +3,7 @@ Company Name Normalizer
 企業名の表記揺れ（株式会社/(株)/㈱/Corp/Ltd 等）を正規化する。
 """
 import re
+from typing import Optional
 
 
 SUFFIX_MAP = {

@@ -171,15 +171,22 @@ def test_acquisition_delay_median_even_count(mock_session):
     service = QualityMetricsService(mock_session)
 
     mock_query = MagicMock()
-    service._bid_query = MagicMock(return_value=mock_query)
-    mock_query.filter.return_value = mock_query
+    mock_filtered = MagicMock()
+    
     # total = 2 (even), mid = 1, offset = 0
-    mock_query.count.return_value = 2
-    mock_query.order_by.return_value = mock_query
-    mock_query.limit.return_value = mock_query
-    mock_query.offset.return_value = mock_query
-    mock_query.with_entities.return_value = mock_query
-    mock_query.all.return_value = [10.0, 20.0]
+    mock_filtered.count.return_value = 2
+    mock_filtered.filter.return_value = mock_filtered
+    mock_filtered.order_by.return_value = mock_filtered
+    mock_filtered.limit.return_value = mock_filtered
+    mock_filtered.offset.return_value = mock_filtered
+    mock_filtered.with_entities.return_value = mock_filtered
+    mock_filtered.all.return_value = [10.0, 20.0]
+    mock_filtered.scalar.return_value = None
+    
+    # Mock the chain: session.query -> _bid_query -> _filtered_bid_query
+    mock_query.filter.return_value = mock_filtered
+    mock_session.query.return_value = mock_query
+    service._bid_query = MagicMock(return_value=mock_filtered)
 
     result = service.acquisition_delay_median()
 

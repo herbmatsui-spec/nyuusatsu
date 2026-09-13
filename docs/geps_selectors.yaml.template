@@ -1,0 +1,18 @@
+selectors_version: "2026.09"
+pages:
+  search_form:
+    query: "input[name='query']"
+    start_date: "input[name='startDate']"
+    end_date: "input[name='endDate']"
+    submit: "button[type='submit']"
+  search_results:
+    item: "tr.result-item"
+    title: "td.title a"
+    organization: "td.organization"
+    budget: "td.budget"
+    deadline: "td.deadline"
+  detail:
+    title: "h1.detail-title"
+    organization: "div.organization-name"
+    budget: "span.budget-amount"
+    deadline: "span.deadline-date"

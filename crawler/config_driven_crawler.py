@@ -1,8 +1,8 @@
 """設定駆動型クローラ
- 
- - `BaseCrawler` を継承し、YAML 設定で対象ページ・パーサー情報を取得
- - `parse_list` と `parse_detail` は設定に基づく CSS セレクタを使用
- - 日付範囲指定による絞り込み機能を提供
+  
+  - `BaseCrawler` を継承し、YAML 設定で対象ページ・パーサー情報を取得
+  - `parse_list` と `parse_detail` は設定に基づく CSS セレクタを使用
+  - 日付範囲指定による絞り込み機能を提供
 """
 
 import yaml
@@ -44,9 +44,43 @@ class ConfigDrivenCrawler(BaseCrawler):
             config.setdefault("detail_fields", {})
             return config
 
+    def parse_list(self, html: str) -> List[Any]:
+        """一覧ページの HTML からアイテムリストを抽出する。
+        
+        設定に list_selector が指定されていればそれを使用し、
+        なければ空リストを返す（詳細ページ直接アクセス型のサイト用）。
+        """
+        if not self.list_selector:
+            return []
+        
+        soup = BeautifulSoup(html, "html.parser")
+        items = []
+        
+        for element in soup.select(self.list_selector):
+            item = {}
+            # 基本的なフィールド抽出
+            for field_name, field_cfg in self.config.get("list_fields", {}).items():
+                selector = field_cfg.get("selector")
+                attr = field_cfg.get("attr", "text")
+                if selector:
+                    el = element.select_one(selector)
+                    if el:
+                        if attr == "text":
+                            item[field_name] = el.get_text(strip=True)
+                        elif attr == "href":
+                            item[field_name] = el.get("href")
+                        elif attr == "src":
+                            item[field_name] = el.get("src")
+                        else:
+                            item[field_name] = el.get(attr)
+            if item:
+                items.append(item)
+        
+        return items
+
     def extract_item_date(self, item: Any) -> Optional[date]:
         """アイテムから日付を抽出
- 
+  
         設定ファイルに date_selector が指定されていればそれを使用、
         なければテキストから抽出を試みる
         """
@@ -58,6 +92,7 @@ class ConfigDrivenCrawler(BaseCrawler):
                 date_text = item.get("date_text") or item.get("deadline") or item.get("announcement_date")
                 if date_text:
                     return parse_date_string(str(date_text))
+
     def parse_detail(self, html: str) -> Any:
         # If detail_fields is not defined, fallback to raw text extraction
         detail_fields = self.config.get("detail_fields", {})
@@ -76,30 +111,7 @@ class ConfigDrivenCrawler(BaseCrawler):
             attr = field_cfg.get("attr", "text")
             transform_name = field_cfg.get("transform")
             multiple = field_cfg.get("multiple", False)
-
-            # Get element(s)
-            if multiple:
-                elements = soup.select(selector)
-                element = soup.select_one(selector)
-                elements = [element] if element else []
-
-        # If detail_fields is not defined, fallback to raw text extraction
-        detail_fields = self.config.get("detail_fields", {})
-        if not detail_fields:
-            soup = BeautifulSoup(html, "html.parser")
-            return soup.get_text(separator="\n", strip=True)
-
-        soup = BeautifulSoup(html, "html.parser")
-        result = {}
-
-        # Import transform map
-        from crawler.parsers.field_normalizer import TRANSFORM_MAP
-
-        for field_name, field_cfg in detail_fields.items():
-            selector = field_cfg.get("selector")
-            attr = field_cfg.get("attr", "text")
-            transform_name = field_cfg.get("transform")
-            multiple = field_cfg.get("multiple", False)
+            required = field_cfg.get("required", False)
 
             # Get element(s)
             if multiple:
@@ -108,8 +120,10 @@ class ConfigDrivenCrawler(BaseCrawler):
                 element = soup.select_one(selector)
                 elements = [element] if element else []
 
-            # If no element found, skip or set None/empty
+            # If no element found, handle required or set None/empty
             if not elements:
+                if required:
+                    raise ValueError(f"Required field {field_name} not found in HTML")
                 result[field_name] = None if not multiple else []
                 continue
 
@@ -142,6 +156,7 @@ class ConfigDrivenCrawler(BaseCrawler):
                 result[field_name] = values[0] if values else None
 
         return result
+
     def crawl_range(
         self,
         start_url: str,
@@ -177,9 +192,10 @@ class ConfigDrivenCrawler(BaseCrawler):
                     logger.info(f"Early stop: all items older than {self.start_date}")
                     break
 
-    finally:
-        self.start_date = original_start
-        self.end_date = original_end
+        finally:
+            self.start_date = original_start
+            self.end_date = original_end
+
     def _get_next_page_url(self, html: str, current_url: str) -> Optional[str]:
         """次のページURLを取得"""
         if not self.pagination_selector:
@@ -189,6 +205,7 @@ class ConfigDrivenCrawler(BaseCrawler):
         if next_link and next_link.get("href"):
             return urljoin(self.base_url, next_link["href"])
         return None
+
     def save(self, items: List[dict], repository: "BidRepository | AwardResultRepository"):
         """Save items to the specified repository
         

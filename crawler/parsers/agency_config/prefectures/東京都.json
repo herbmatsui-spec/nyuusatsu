@@ -1,0 +1,31 @@
+{
+  "東京都": {
+    "enabled": true,
+    "entry_url": "https://www.metro.tokyo.lg.jp/tosei/keiyaku/nyusatsu/",
+    "url_includes": [
+      "/tosei/keiyaku/nyusatsu/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告",
+      "調達",
+      "競争"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']",
+      "a[href*='doc']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "東京都庁",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase",
+      "koukoku"
+    ]
+  }
+}

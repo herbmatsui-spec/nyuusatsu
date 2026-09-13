@@ -1,0 +1,14 @@
+{
+  "municipality_code": "",
+  "name": "",
+  "enabled": true,
+  "entry_url": "",
+  "url_includes": ["/"],
+  "title_keywords": ["入札", "公告", "調達", "競争"],
+  "css_selectors": ["a[href*='pdf']"],
+  "requires_login": false,
+  "dynamic_strategy": "network_idle",
+  "notes": "high_priority",
+  "max_depth": 2,
+  "link_keywords": ["nyusatsu", "sougou", "hendou", "ippann", "oshirase"]
+}

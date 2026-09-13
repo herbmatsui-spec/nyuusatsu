@@ -1,9 +1,10 @@
 import logging
 from datetime import datetime, timezone
-from database.session import get_db
+from database.session import get_session
 from database.models.crawl import SystemSetting
 from services.notification_service import NotificationService
 from services.crawl_service import CrawlService
+from typing import Optional
 
 logger = logging.getLogger("AlertManager")
 
@@ -54,12 +55,15 @@ class AlertManager:
     ヘルスチェックの結果を評価し、エラー状態が指定回数（デフォルト3回）連続した場合に
     Slack / LINE 通知を送信するアラートマネージャー。
     """
-    _consecutive_failures = {}
 
     def __init__(self, failure_threshold: int = 3):
         self.failure_threshold = failure_threshold
+        self._consecutive_failures = {}
         # NotificationServiceの初期化にCrawlServiceが必要
-        with get_db() as session:
+        from services.crawl_service import CrawlService
+        from services.notification_service import NotificationService
+        
+        with get_session() as session:
             crawl_service = CrawlService(session)
             self.notifier = NotificationService(crawl_service)
 

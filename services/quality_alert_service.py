@@ -7,13 +7,15 @@
 
 import os
 import logging
+from pathlib import Path
 from datetime import datetime, date
 
 from database.redis_conn import redis_conn
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_THRESHOLDS_PATH = "config/quality_thresholds.yaml"
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_THRESHOLDS_PATH = str(_PROJECT_ROOT / "config" / "quality_thresholds.yaml")
 
 
 def _load_yaml_thresholds(path: str | None = None) -> dict:

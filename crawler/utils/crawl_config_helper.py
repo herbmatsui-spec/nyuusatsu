@@ -1,7 +1,12 @@
 from typing import Dict, Optional, Any
 from dataclasses import dataclass
-from config import CrawlerConfig
-from config.award_urls import AWARD_URL_PATTERNS
+
+@dataclass
+class CrawlerConfig:
+    """クローラ設定"""
+    user_agent: str = "test-agent"
+    request_timeout: int = 30
+    parallel_downloads: int = 4
 
 @dataclass
 class CrawlTarget:
@@ -16,6 +21,19 @@ class CrawlTarget:
     user_agent: str
     timeout: int
     parallel_downloads: int
+
+# モック用の URL パターン
+AWARD_URL_PATTERNS = {
+    "test_agency": {
+        "name": "テスト機関",
+        "list_url": "https://test.example.com/list",
+        "detail_pattern": "https://test.example.com/detail/{id}",
+    },
+    "another_agency": {
+        "name": "別機関",
+        "list_url": "https://another.example.com/list",
+    },
+}
 
 def get_crawl_config_for_agency(agency_key: str, base_config: CrawlerConfig) -> Optional[CrawlTarget]:
     """

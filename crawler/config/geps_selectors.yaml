@@ -2,74 +2,73 @@ selectors_version: "2026.09"
 pages:
   search_form:
     query:
+      - '#query'
       - 'input[name="query"]'
       - 'input#query'
       - 'input[type="search"]'
     start_date:
+      - '#startDate'
       - 'input[name="startDate"]'
-      - 'input[name="fromDate"]'
-      - 'input[name="dateFrom"]'
+      - 'input[type="date"][name="startDate"]'
       - 'input[id*="start"]'
-      - 'input[id*="from"]'
-      - 'input#startDate'
     end_date:
+      - '#endDate'
       - 'input[name="endDate"]'
-      - 'input[name="toDate"]'
-      - 'input[name="dateTo"]'
+      - 'input[type="date"][name="endDate"]'
       - 'input[id*="end"]'
-      - 'input[id*="to"]'
-      - 'input#endDate'
     submit:
+      - '#searchButton'
       - 'button[type="submit"]'
       - 'input[type="submit"]'
-      - 'button#searchButton'
   search_results:
     item:
-      - 'div.search-result-item'
-      - 'div.result-item'
+      - '.search-result-item'
+      - '.result-item'
       - 'tr.result-row'
       - 'table tr'
     title:
-      - 'a.title'
-      - 'td.title'
+      - '.title'
+      - '.result-title'
+      - 'td.title a'
       - 'a[href]'
-      - 'a.result-title'
     organization:
-      - 'span.organization'
+      - '.organization'
+      - '.result-organization'
       - 'td.organization'
       - 'td:nth-child(2)'
-      - 'span.result-organization'
     budget:
-      - 'span.budget'
+      - '.budget'
+      - '.result-budget'
       - 'td.budget'
       - 'td:nth-child(3)'
-      - 'span.result-budget'
     deadline:
-      - 'span.deadline'
+      - '.deadline'
+      - '.result-deadline'
       - 'td.deadline'
       - 'td:nth-child(4)'
-      - 'span.result-deadline'
     pdf_url:
+      - '.pdf-url'
+      - '.result-pdf'
       - 'a[href$=".pdf"]'
       - 'a[href*=".pdf"]'
   detail:
     title:
+      - '#detailTitle'
       - 'h1'
       - '[data-field="title"]'
       - 'title'
-      - 'h1#detailTitle'
     organization:
+      - '#detailOrganization'
       - '[data-field="organization"]'
       - '.organization'
       - 'th.organization + td'
-      - 'span#detailOrganization'
     budget:
+      - '#detailBudget'
       - '[data-field="budget"]'
       - '.budget'
       - 'th.budget + td'
-      - 'span#detailBudget'
     deadline:
+      - '#detailDeadline'
       - '[data-field="deadline"]'
       - '.deadline'
       - 'th.deadline + td'
-      - 'span#detailDeadline'
