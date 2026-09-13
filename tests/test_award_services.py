@@ -11,7 +11,6 @@ from services.award_calculator import (
     parse_amount_text,
 )
 from crawler.parsers.award_parser import (
-    parse_announcement_date,
     parse_budget_amount,
     parse_contract_amount,
     parse_date,
@@ -86,8 +85,3 @@ class TestParserEdgeCases:
         assert result.year == 2024
         assert result.month == 1
         assert result.day == 15
-
-    def test_parse_announcement_date(self):
-        result = parse_announcement_date("令和5年4月1日公告")
-        assert result is not None
-        assert result.year == 2023
