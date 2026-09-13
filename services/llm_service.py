@@ -24,12 +24,12 @@ class LLMService:
             self.providers.append(DeepSeekProvider(deepseek_key, config))
         if active_provider != "gemini" and gemini_key:
             self.providers.append(GeminiProvider(gemini_key, config))
-
+    
     @property
     def active_provider_name(self) -> str:
         """現在優先的に使用されているプロバイダー名を返す"""
         return self.config.llm.active_provider
-
+    
     def get_active_provider(self) -> Optional[LLMProvider]:
         """現在アクティブなプロバイダーのインスタンスを返す"""
         for p in self.providers:
@@ -37,7 +37,7 @@ class LLMService:
             if p_name == self.config.llm.active_provider:
                 return p
         return self.providers[0] if self.providers else None
-
+    
     def analyze_with_fallback(self, text: str) -> Dict[str, Any]:
         """Try providers in order until one succeeds."""
         from services.cost_manager import CostManager
@@ -73,5 +73,5 @@ class LLMService:
                 # ここでは単純に次のプロバイダーへフォールバックする
                 last_error = e
                 continue
-        
+                
         raise last_error or Exception("All LLM providers failed or are not configured.")

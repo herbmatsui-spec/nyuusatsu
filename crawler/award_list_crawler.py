@@ -29,7 +29,7 @@ def get_crawler_for_agency(agency_key: str) -> Optional[AwardBaseCrawler]:
     if crawler_cls:
         # GEPSAwardCrawlerなどの一部のクローラはAppConfigを必要とするため
         # ここでインスタンス化の仕方を調整する
-        from config import AppConfig
+        from config_dir import AppConfig
         config = AppConfig()
         
         if crawler_cls == GEPSAwardCrawler:

@@ -1,6 +1,8 @@
 """Auto-generated SQLAlchemy models from bids_system.db + bids.db schema."""
-from sqlalchemy import Column, Integer, String, Text, Float, LargeBinary, Boolean, DateTime, Numeric, ForeignKey
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, Integer, String, Text, Float, LargeBinary, Boolean, DateTime, Numeric, ForeignKey, Enum as SQLEnum
+from sqlalchemy.orm import declarative_base, relationship
+import enum
+from datetime import datetime
 Base = declarative_base()
 
 class Agency(Base):
@@ -16,6 +18,24 @@ class Agency(Base):
     category_id = Column(Integer, ForeignKey('agency_categories.id'))
     priority_level = Column(Integer, )
     system_type = Column(Text, )
+    backfill_jobs = relationship("BackfillJob", back_populates="agency")
+
+
+class AgencyInventory(Base):
+    __tablename__ = 'agency_inventory'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agency_name = Column(String(255), nullable=False, index=True)
+    prefecture_code = Column(String(2), nullable=False, index=True)
+    municipality = Column(String(128), nullable=True)
+    top_page_url = Column(String(1024), nullable=True)
+    bid_page_url = Column(String(1024), nullable=True)
+    page_format = Column(String(16), nullable=False, default="unknown")
+    is_crawled = Column(Boolean, default=False)
+    crawler_config_id = Column(Integer, ForeignKey("crawl_configs.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 class AgencyCategory(Base):
     __tablename__ = 'agency_categories'
@@ -510,4 +530,57 @@ class User(Base):
     org_id = Column(Integer, ForeignKey('organizations.id'))
     is_active = Column(Boolean, nullable=False, default='1')
     created_at = Column(DateTime, nullable=False, default='CURRENT_TIMESTAMP')
+    plan = Column(String(20), default='free', nullable=False)
+    stripe_customer_id = Column(String(100), unique=True, nullable=True)
+    stripe_subscription_id = Column(String(100), unique=True, nullable=True)
+    trial_ends_at = Column(DateTime, nullable=True)
+    subscription_status = Column(String(20), default='inactive', nullable=False)
+    current_period_end = Column(DateTime, nullable=True)
+
+
+class BackfillJobStatus(str, enum.Enum):
+    """バックフィルジョブのステータス"""
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class BackfillJob(Base):
+    """バックフィル実行ジョブ"""
+    __tablename__ = 'backfill_jobs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agency_id = Column(Integer, ForeignKey('agencies.id'), nullable=False, index=True)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    status = Column(SQLEnum(BackfillJobStatus), nullable=False, default=BackfillJobStatus.PENDING, index=True)
+    fetched_count = Column(Integer, nullable=False, default=0)
+    new_count = Column(Integer, nullable=False, default=0)
+    updated_count = Column(Integer, nullable=False, default=0)
+    error_count = Column(Integer, nullable=False, default=0)
+    error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    agency = relationship("Agency", back_populates="backfill_jobs")
+    logs = relationship("BackfillJobLog", back_populates="job", cascade="all, delete-orphan")
+
+
+class BackfillJobLog(Base):
+    """バックフィルジョブ実行ログ"""
+    __tablename__ = 'backfill_job_logs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(Integer, ForeignKey('backfill_jobs.id'), nullable=False, index=True)
+    step = Column(String(100), nullable=False)
+    message = Column(Text, nullable=False)
+    level = Column(String(20), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    job = relationship("BackfillJob", back_populates="logs")
 

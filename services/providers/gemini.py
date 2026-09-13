@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from config import AppConfig
 from utils.rate_limiter import gemini_limiter
 from utils.usage_tracker import log_api_usage

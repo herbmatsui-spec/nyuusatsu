@@ -1,0 +1,31 @@
+{
+  "香川県": {
+    "enabled": true,
+    "entry_url": "https://www.pref.kagawa.lg.jp/site/nyusatsu/",
+    "url_includes": [
+      "/site/nyusatsu/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告",
+      "調達",
+      "競争"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']",
+      "a[href*='doc']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "香川県庁",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase",
+      "koukoku"
+    ]
+  }
+}

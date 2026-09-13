@@ -1,0 +1,74 @@
+selectors_version: "2026.09"
+pages:
+  search_form:
+    query:
+      - '#query'
+      - 'input[name="query"]'
+      - 'input#query'
+      - 'input[type="search"]'
+    start_date:
+      - '#startDate'
+      - 'input[name="startDate"]'
+      - 'input[type="date"][name="startDate"]'
+      - 'input[id*="start"]'
+    end_date:
+      - '#endDate'
+      - 'input[name="endDate"]'
+      - 'input[type="date"][name="endDate"]'
+      - 'input[id*="end"]'
+    submit:
+      - '#searchButton'
+      - 'button[type="submit"]'
+      - 'input[type="submit"]'
+  search_results:
+    item:
+      - '.search-result-item'
+      - '.result-item'
+      - 'tr.result-row'
+      - 'table tr'
+    title:
+      - '.title'
+      - '.result-title'
+      - 'td.title a'
+      - 'a[href]'
+    organization:
+      - '.organization'
+      - '.result-organization'
+      - 'td.organization'
+      - 'td:nth-child(2)'
+    budget:
+      - '.budget'
+      - '.result-budget'
+      - 'td.budget'
+      - 'td:nth-child(3)'
+    deadline:
+      - '.deadline'
+      - '.result-deadline'
+      - 'td.deadline'
+      - 'td:nth-child(4)'
+    pdf_url:
+      - '.pdf-url'
+      - '.result-pdf'
+      - 'a[href$=".pdf"]'
+      - 'a[href*=".pdf"]'
+  detail:
+    title:
+      - '#detailTitle'
+      - 'h1'
+      - '[data-field="title"]'
+      - 'title'
+    organization:
+      - '#detailOrganization'
+      - '[data-field="organization"]'
+      - '.organization'
+      - 'th.organization + td'
+    budget:
+      - '#detailBudget'
+      - '[data-field="budget"]'
+      - '.budget'
+      - 'th.budget + td'
+    deadline:
+      - '#detailDeadline'
+      - '[data-field="deadline"]'
+      - '.deadline'
+      - 'th.deadline + td'

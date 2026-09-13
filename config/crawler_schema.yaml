@@ -1,12 +1,34 @@
-# 発注機関クローリング設定スキーマ（YAML）
-# 各機関ごとにパーサー種別・ページネーション・リンク抽出方法などを定義
-# 例:
-# agency_name: "北海道庁"
-# list_url: "https://www.pref.hokkaido.lg.jp/…/bid_list.html"
-# list_selector: "a.bid-link"
-# detail_selector: "div.detail"
-# pagination_selector: "a.next"
-# page_format: "html"
-# parser: "html"
-#
-# 実運用ではこのファイルを `scripts/gen_crawler.py` が自動生成する
+# Agency-specific crawler configuration schema
+# Each agency can have a YAML file with the following fields:
+
+agency:
+  name: " Agency name (string) "
+  # Base URL of the agency's website
+  base_url: "https://example.com"
+  # URL of the list page (can be same as base_url or different)
+  list_url: "https://example.com/bids"
+  # CSS selector for list page links to detail pages
+  list_selector: "a.bid-link"
+  # CSS selector for detail page container (or leave empty to use whole page)
+  detail_selector: "div.detail"
+  # Page format: html, pdf, or mixed
+  page_format: html
+  # Parser type: html or pdf (if mixed, parser is auto-detected)
+  parser: html
+  # Optional: detail fields to extract (if parser is html)
+  detail_fields:
+    title:
+      selector: "h1.title"
+      attr: text
+      transform: none
+    price:
+      selector: "span.price"
+      attr: text
+      transform: remove_commas_and_yen
+    deadline:
+      selector: "span.deadline"
+      attr: text
+      transform: to_date
+  # Optional: custom headers for requests
+  headers:
+    User-Agent: "Mozilla/5.0 (compatible; BidExtractor/1.0)"

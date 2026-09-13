@@ -5,6 +5,7 @@
 """
 import os
 import sys
+from datetime import datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -36,6 +37,8 @@ def seed_prefectures(session) -> int:
             code=code, name=name, kana_name=kana,
             region_code=region, priority=priority,
             official_url=official_url, is_active=True,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         ))
         count += 1
     session.commit()
@@ -44,7 +47,7 @@ def seed_prefectures(session) -> int:
 
 def seed_hokkaido_sources(session) -> int:
     """北海道のみの専用ソース（web+geps）を登録。"""
-    hokkaido = session.query(Prefecture).filter_by(code="JP-01").first()
+    hokkaido = session.query(Prefecture).filter_by(code="01").first()
     if not hokkaido:
         return 0
     count = 0
@@ -55,9 +58,18 @@ def seed_hokkaido_sources(session) -> int:
             prefecture_id=hokkaido.id,
             source_type=source_type,
             url=url,
+            url_pattern=None,
             parser_type=parser_type,
+            css_selectors=None,
+            requires_login=False,
+            username=None,
+            password=None,
+            last_crawled_at=None,
+            crawl_interval_hours=24,
             is_active=True,
             notes=notes,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         ))
         count += 1
     session.commit()
@@ -78,9 +90,18 @@ def seed_all_sources(session) -> int:
             prefecture_id=pref.id,
             source_type=source_type,
             url=url,
+            url_pattern=None,
             parser_type=parser_type,
+            css_selectors=None,
+            requires_login=False,
+            username=None,
+            password=None,
+            last_crawled_at=None,
+            crawl_interval_hours=24,
             is_active=True,
             notes=notes,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         ))
         count += 1
     session.commit()
@@ -97,7 +118,7 @@ def main() -> None:
         total = session.query(Prefecture).count()
         total_src = session.query(BidSource).count()
         hok = session.query(BidSource).filter_by(
-            prefecture_id=session.query(Prefecture).filter_by(code="JP-01").first().id
+            prefecture_id=session.query(Prefecture).filter_by(code="01").first().id
         ).count()
         print(f" prefecture inserted (new): {p}")
         print(f" hokkaido bid_source inserted (new): {s}")

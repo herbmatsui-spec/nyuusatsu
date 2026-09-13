@@ -1,0 +1,9 @@
+1. Seed prefectures master data into database
+2. Seed national ministries master data into database
+3. Prepare and seed nationwide municipality master data
+4. Generate crawler configuration files for all 47 prefectures
+5. Generate crawler configs for high-priority municipalities (e.g., population >100k)
+6. Implement URL registry and sync system to populate agency base_url/bid_pattern
+7. Enhance base crawler to filter by agency category and priority level
+8. Implement automatic site structure detection and selector generation
+9. Implement dynamic crawl frequency adjustment and success monitoring by category/priority

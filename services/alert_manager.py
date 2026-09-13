@@ -1,23 +1,69 @@
 import logging
-from datetime import datetime
-from database.session import get_db
+from datetime import datetime, timezone
+from database.session import get_session
 from database.models.crawl import SystemSetting
 from services.notification_service import NotificationService
 from services.crawl_service import CrawlService
+from typing import Optional
 
 logger = logging.getLogger("AlertManager")
+
+
+def send_slack_alert(message: str) -> bool:
+    """Slack へ通知する。"""
+    from notifier import create_notification_service
+
+    try:
+        return bool(create_notification_service("slack").send(message))
+    except Exception as e:
+        logger.error(f"Failed to send Slack alert: {e}")
+        return False
+
+
+def send_line_alert(message: str) -> bool:
+    """LINE へ通知する。"""
+    from notifier import create_notification_service
+
+    try:
+        return bool(create_notification_service("line").send(message))
+    except Exception as e:
+        logger.error(f"Failed to send LINE alert: {e}")
+        return False
+
+
+def send_live_test_report(report_path, exit_code: int) -> dict[str, bool]:
+    """ライブテストレポートを Slack と LINE の両方に送信する。"""
+    from pathlib import Path
+
+    path = Path(report_path)
+    if not path.exists():
+        logger.warning(f"Live test report not found: {path}")
+        return {"slack": False, "line": False}
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    summary_lines = [line for line in lines if line.startswith(("# ", "- "))][:10]
+    message = "GEPS ライブテスト結果\n" + "\n".join(summary_lines)
+    message += f"\nレポート: {path}\n終了コード: {exit_code}"
+    return {
+        "slack": send_slack_alert(message),
+        "line": send_line_alert(message),
+    }
+
 
 class AlertManager:
     """
     ヘルスチェックの結果を評価し、エラー状態が指定回数（デフォルト3回）連続した場合に
     Slack / LINE 通知を送信するアラートマネージャー。
     """
-    _consecutive_failures = {}
 
     def __init__(self, failure_threshold: int = 3):
         self.failure_threshold = failure_threshold
+        self._consecutive_failures = {}
         # NotificationServiceの初期化にCrawlServiceが必要
-        with get_db() as session:
+        from services.crawl_service import CrawlService
+        from services.notification_service import NotificationService
+        
+        with get_session() as session:
             crawl_service = CrawlService(session)
             self.notifier = NotificationService(crawl_service)
 
@@ -87,7 +133,7 @@ class AlertManager:
                     AlertHistory.resolved_at.is_(None)
                 ).all()
                 for alert in unresolved:
-                    alert.resolved_at = datetime.utcnow()
+                    alert.resolved_at = datetime.now(timezone.utc)
             else:
                 alert = AlertHistory(
                     component=component,

@@ -69,7 +69,7 @@ def test_3_llm_service():
     logger.info("Test 3: LLM Analysis Service")
     
     try:
-        from config import AppConfig
+        from config_dir import AppConfig
         config = AppConfig()
         
         deepseek_key = os.environ.get('DEEPSEEK_API_KEY')
@@ -146,7 +146,7 @@ def test_7_local_government_crawler():
     """Test 7: Local Government Crawler"""
     logger.info("Test 7: Local Government Crawler")
     
-    from config import AppConfig
+    from config_dir import AppConfig
     config = AppConfig()
     
     logger.info(f"Target URL: {config.crawler.target_url}")

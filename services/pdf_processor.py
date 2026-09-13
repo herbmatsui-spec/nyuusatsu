@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import pdfplumber
+from pdfplumber.utils.exceptions import PdfminerException
 
 from config import AppConfig
 from exceptions import OCRProcessingError, PDFExtractionError
@@ -44,7 +45,7 @@ class PDFProcessor:
                                 )
                                 page_text += "\n" + row_text
                     texts.append(page_text)
-        except pdfplumber.PDFException as exc:
+        except PdfminerException as exc:
             raise PDFExtractionError(f"PDFの読み込みに失敗しました（pdfplumberエラー）: {exc}") from exc
         except PermissionError as exc:
             raise PDFExtractionError(f"PDFファイルにアクセス権限がありません: {exc}") from exc
@@ -70,7 +71,7 @@ class PDFProcessor:
                                 )
                                 page_text += "\n" + row_text
                     texts.append(page_text)
-        except pdfplumber.PDFException as exc:
+        except PdfminerException as exc:
             raise PDFExtractionError(f"PDFの読み込みに失敗しました（pdfplumberエラー）: {exc}") from exc
         except PermissionError as exc:
             raise PDFExtractionError(f"PDFファイルにアクセス権限がありません: {exc}") from exc

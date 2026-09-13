@@ -10,7 +10,7 @@ app.py と同様の認証ゲートを持つ（ENABLE_AUTH=true の場合）。
 import streamlit as st
 from dotenv import load_dotenv
 
-from config import AppConfig
+from config_dir import AppConfig
 from database.repositories.extraction_result_repository import ExtractionResultRepository
 from utils.auth_decorator import is_authenticated
 from utils.session_manager import get_session_manager

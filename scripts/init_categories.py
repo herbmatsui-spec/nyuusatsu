@@ -1,5 +1,10 @@
-from database.models import AgencyCategory
-from database.session import get_db
+import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from database.models.agency_category import AgencyCategory
+from database.session import get_session
 
 def init_agency_categories():
     """
@@ -12,7 +17,7 @@ def init_agency_categories():
         {"name": "外郭団体", "description": "公社・公団・公立病院等", "priority": 4},
     ]
     
-    with get_db() as session:
+    with get_session() as session:
         for cat_data in categories:
             # 重複チェック
             exists = session.query(AgencyCategory).filter_by(name=cat_data["name"]).first()

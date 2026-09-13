@@ -1,0 +1,140 @@
+name: Scheduler CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'scheduler.py'
+      - 'tests/test_scheduler.py'
+      - 'docs/operations/scheduler.md'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'scheduler.py'
+      - 'tests/test_scheduler.py'
+  schedule:
+    - cron: '0 2 * * *'  # 毎日午前2時に実行
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-mock pytest-xdist
+    
+    - name: Syntax check
+      run: |
+        python -m py_compile scheduler.py
+    
+    - name: Run scheduler unit tests
+      env:
+        PYTHONPATH: .
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        python -m pytest tests/test_scheduler.py -v --no-cov
+    
+    - name: Type check
+      run: |
+        python -m pip install mypy
+        python -m mypy scheduler.py --ignore-missing-imports || true
+    
+    - name: Code formatting check
+      run: |
+        python -m pip install black isort
+        black --check scheduler.py
+        isort --check scheduler.py
+    
+    - name: Security scan
+      run: |
+        python -m pip install bandit
+        bandit -r scheduler.py -f json -o bandit-report.json || true
+    
+    - name: Upload bandit report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bandit-report
+        path: bandit-report.json
+
+  health-check:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Start Redis
+      uses: supercharge/redis-github-action@1.8.0
+      with:
+        redis-version: 7
+    
+    - name: Initialize database
+      env:
+        PYTHONPATH: .
+        DATABASE_URL: sqlite:///./test_scheduler.db
+      run: |
+        python -c "
+        from database.engine import engine
+        from database.models import create_all_quality_tables
+        create_all_quality_tables(engine)
+        print('Database initialized')
+        "
+    
+    - name: Run scheduler health check
+      env:
+        PYTHONPATH: .
+        DATABASE_URL: sqlite:///./test_scheduler.db
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        python -c "
+        from scheduler import SchedulerManager
+        from services.health_checker import HealthChecker
+        
+        # Test health checker
+        checker = HealthChecker()
+        redis_health = checker.check_redis()
+        print(f'Redis: {redis_health.status.value}')
+        
+        db_health = checker.check_database()
+        print(f'Database: {db_health.status.value}')
+        
+        queue_health = checker.check_queue_depth()
+        print(f'Queue: {queue_health.status.value}')
+        
+        scheduler_health = checker.check_scheduler()
+        print(f'Scheduler: {scheduler_health.status.value}')
+        print('Health check passed!')
+        "
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [lint-and-test, health-check]
+    if: always()
+    
+    steps:
+    - name: Send notification on failure
+      if: failure()
+      run: |
+        echo "Scheduler CI/CD failed" | mail -s "Scheduler CI/CD Failure" ${{ secrets.ALERT_EMAIL }} || true

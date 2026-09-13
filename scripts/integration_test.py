@@ -47,7 +47,7 @@ def test_imports() -> bool:
 
 
 def test_config() -> bool:
-    from config import AppConfig
+    from config_dir import AppConfig
     cfg = AppConfig()
     assert hasattr(cfg, "auth"), "AuthConfig が不足"
     assert hasattr(cfg, "rate_limit"), "RateLimitConfig が不足"

@@ -1,5 +1,10 @@
+import atexit
 import os
+import shutil
 import sys
+from datetime import datetime
+from pathlib import Path
+from threading import Lock
 
 # プロジェクトルートを sys.path に追加
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -7,7 +12,7 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 import pytest
-from datetime import datetime
+import yaml
 
 # --------------------------------------------------------------
 # Live Integration Test Fixtures
@@ -31,16 +36,58 @@ def geps_skip_live():
     """GEPS_SKIP_LIVEが設定されている場合はTrue"""
     return os.getenv("GEPS_SKIP_LIVE", "").lower() in ("1", "true", "yes")
 
+
+# --------------------------------------------------------------
+# Phase 0: 対象自治体リストの読み込みとパラメータライズ
+# --------------------------------------------------------------
+
+def _load_target_municipalities() -> list[tuple[str, str]]:
+    """targets.yaml から自治体リストを読み込み、 (prefecture, city) タプルのリストを返す"""
+    targets_path = Path(__file__).parent / "targets.yaml"
+    if not targets_path.exists():
+        return []
+    with targets_path.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    result = []
+    for prefecture, cities in data.items():
+        if isinstance(cities, list):
+            for city in cities:
+                result.append((prefecture, city))
+    return result
+
+
+def pytest_generate_tests(metafunc: pytest.Metafunc):
+    """自治体リストでテストをパラメータライズ"""
+    if "prefecture" in metafunc.fixturenames and "city" in metafunc.fixturenames:
+        municipalities = _load_target_municipalities()
+        if municipalities:
+            metafunc.parametrize("prefecture,city", municipalities, scope="function")
+
+
 # --------------------------------------------------------------
 # Phase 0: 環境チェックfixture
 # --------------------------------------------------------------
 
+def _check_required_env_vars() -> list[str]:
+    """必須環境変数が設定されているかチェックし、不足分を返す"""
+    configured = os.getenv("LIVE_TEST_REQUIRED_ENV_VARS", "").strip()
+    required = [var.strip() for var in configured.split(",") if var.strip()] if configured else ["DEEPSEEK_API_KEY", "GEMINI_API_KEY"]
+    return [var for var in required if not os.getenv(var)]
+
+
 @pytest.fixture(autouse=True)
-def check_geps_environment(live_geps_url, geps_skip_live):
-    """本番テスト前の環境チェックとスキップ判定"""
+def check_geps_environment(request, live_geps_url, geps_skip_live):
+    """本番テスト前の環境チェックとスキップ判定 (live_test マーカーがあるテストのみ)"""
+    # live_test マーカーがないテストはスキップしない
+    if not request.node.get_closest_marker("live_test"):
+        return
     if geps_skip_live:
         pytest.skip("GEPS_SKIP_LIVE 環境変数が設定されているため、本番テストをスキップ")
-    
+
+    missing_vars = _check_required_env_vars()
+    if missing_vars:
+        pytest.skip(f"必須環境変数が未設定: {', '.join(missing_vars)}。本番テストをスキップ")
+
     # 基本URLアクセス可能か確認（高速ping用）
     import requests
     try:
@@ -54,6 +101,19 @@ def check_geps_environment(live_geps_url, geps_skip_live):
     except Exception as e:
         # ネットワークエラーはテストを失敗させずスキップ
         pytest.skip(f"GEPSサイトへの接続に失敗: {e}。本番テストをスキップ")
+
+
+# --------------------------------------------------------------
+# pytest マーカー設定 (timeout, flaky, xdist)
+# --------------------------------------------------------------
+
+def pytest_configure(config: pytest.Config):
+    """pytest 設定時にマーカーを登録"""
+    config.addinivalue_line("markers", "timeout(seconds): タイムアウト秒数を指定")
+    config.addinivalue_line("markers", "flaky(reruns, reruns_delay): フレーキーテスト対策リトライ")
+    config.addinivalue_line("markers", "live_test: 本番環境テストマーカー")
+    config.addinivalue_line("markers", "integration: 統合テストマーカー")
+
 
 # --------------------------------------------------------------
 # Phase 0: 共通ヘルパー
@@ -83,12 +143,6 @@ def validate_response_status():
 def skip_reason(reason: str):
     """スキップ理由を生成"""
     return pytest.mark.skip(reason=reason)
-
-# --------------------------------------------------------------
-# 重要: テスト状態フラグ
-# --------------------------------------------------------------
-import atexit
-from threading import Lock
 
 _live_test_status = {
     'total_tests': 0,
@@ -140,28 +194,46 @@ def cleanup_live_test_resources():
     yield
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 本番テスト後のクリーンアップを実行")
     # 対外的クリーンアップがある場合ここに追加
-    
 # --------------------------------------------------------------
-# 本番テスト用共通ヘルパー（いまだけ、非Gitignore）
+# Step 1: タイムスタンプ付き一時ディレクトリ fixture
 # --------------------------------------------------------------
 
-def save_test_result(test_name: str, status: str, error_msg: str = None, duration: float = 0.0):
-    """テスト結果を保存するヘルパー"""
-    with _live_test_status['lock']:
-        _live_test_status['total_tests'] += 1
-        if status == 'passed':
-            _live_test_status['passed_tests'] += 1
-        elif status == 'failed':
-            _live_test_status['failed_tests'] += 1
-        elif status == 'skipped':
-            _live_test_status['skipped_tests'] += 1
-    
-    # 結果をログに記録
-    status_icon = {"passed": "✓", "failed": "✗", "skipped": "⏭"}.get(status, "?")
-    print(f"  {status_icon} {test_name} ({duration:.2f}秒) - {status}")
-    if error_msg and status == 'failed':
-        print(f"    エラー: {error_msg}")
+@pytest.fixture(scope="session")
+def live_test_dir(tmp_path_factory):
+    """タイムスタンプ付き一時ディレクトリ（成功時は削除、失敗時は保持）"""
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    d = tmp_path_factory.mktemp(f"live_test_{ts}")
+    yield d
 
-# 
-# 本番テスト用に一時ファイルを保存するディレクトリ（テスト中に削除されるはず）
-# TODO: 本番テストごとに固有のタイムスタンプでディレクトリを作成し、クリーンアップ
+    # クリーンアップ: 成功時のみ削除、失敗時は残す
+    if not getattr(live_test_dir, "_failed", False):
+        import shutil
+        shutil.rmtree(d, ignore_errors=True)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """失敗したライブテストの一時ディレクトリを保持する"""
+    outcome = yield
+    report = outcome.get_result()
+    if report.failed:
+        live_test_dir._failed = True
+
+
+# --------------------------------------------------------------
+# デフォルト timeout / flaky マーカーの自動付与
+# --------------------------------------------------------------
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]):
+    """テスト収集後にデフォルトの timeout と flaky マーカーを付与"""
+    default_timeout = int(os.getenv("GEPS_DEFAULT_TIMEOUT", "300"))
+    default_reruns = int(os.getenv("GEPS_DEFAULT_RERUNS", "2"))
+    default_reruns_delay = int(os.getenv("GEPS_DEFAULT_RERUNS_DELAY", "10"))
+    live_root = Path(__file__).parent
+    for item in items:
+        is_live_test = item.get_closest_marker("live_test") or Path(item.path).is_relative_to(live_root)
+        if is_live_test:
+            if not item.get_closest_marker("timeout"):
+                item.add_marker(pytest.mark.timeout(default_timeout))
+            if not item.get_closest_marker("flaky"):
+                item.add_marker(pytest.mark.flaky(max_runs=default_reruns + 1, min_passes=1))

@@ -8,7 +8,7 @@ from datetime import datetime
 
 from database.engine import get_session
 from services.forecast_search_service import ForecastSearchService
-from config import AppConfig
+from config_dir import AppConfig
 
 
 def render():

@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 import plotly.express as px
 
-from config import AppConfig
+from config_dir import AppConfig
 from utils.auth_decorator import is_authenticated
 from utils.session_manager import get_session_manager
 from utils.ui import inject_custom_css

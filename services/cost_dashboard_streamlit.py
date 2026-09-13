@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from services.cost_manager import CostManager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 def render_cost_page():
     st.title("💰 LLM API 利用コスト可視化")
@@ -27,7 +27,7 @@ def render_cost_page():
     # 直近30日のデータ収集
     data = []
     for i in range(30, -1, -1):
-        date_str = (datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d")
+        date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
         usage = cost_manager.get_daily_usage(date_str)
         data.append({
             "date": usage["date"],

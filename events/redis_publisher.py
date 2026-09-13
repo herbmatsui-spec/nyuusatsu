@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any, Dict
 from events.publisher import EventPublisher
-from config import AppConfig
+from config_dir import AppConfig
 
 logger = logging.getLogger(__name__)
 

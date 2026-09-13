@@ -1,0 +1,18 @@
+detail_fields:
+  field1:
+    selector: ".price"
+    attr: "text"
+    transform: "normalize_amount"
+    required: true
+
+  field2:
+    selector: ".date"
+    attr: "text"
+    transform: "normalize_date"
+    multiple: false
+
+  field3:
+    selector: ".title"
+    attr: "text"
+    transform: "normalize_whitespace"
+    multiple: true

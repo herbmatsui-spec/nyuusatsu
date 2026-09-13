@@ -27,7 +27,14 @@ def db_session():
 
 
 def _create_bid(session, name="テスト案件") -> Bid:
-    bid = Bid(filename=f"{name}.pdf", source_url="http://example.com/x.pdf")
+    bid = Bid(
+        filename=f"{name}.pdf",
+        source_url="http://example.com/x.pdf",
+        analyzed_at=datetime.utcnow(),
+        current_status="未確認",
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
     session.add(bid)
     session.flush()
     return bid
@@ -47,6 +54,8 @@ def test_get_upcoming_filters_correctly(db_session):
         question_deadline=date.today(),
         submit_deadline=date.today() + __import__("datetime").timedelta(days=10),
         opening_date=date.today() + __import__("datetime").timedelta(days=5),
+        raw_text_length=100,
+        created_at=datetime.utcnow(),
     )
     db_session.add(ext)
     db_session.flush()
@@ -65,11 +74,15 @@ def test_get_by_bid(db_session):
         filename=bid1.filename,
         bid_id=bid1.id,
         submit_deadline=date.today(),
+        raw_text_length=100,
+        created_at=datetime.utcnow(),
     )
     ext2 = ExtractionResult(
         filename=bid2.filename,
         bid_id=bid2.id,
         submit_deadline=date.today(),
+        raw_text_length=100,
+        created_at=datetime.utcnow(),
     )
     db_session.add_all([ext1, ext2])
     db_session.flush()

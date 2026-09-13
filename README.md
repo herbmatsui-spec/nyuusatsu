@@ -1,10 +1,15 @@
 # 入札システム (Bid Extraction System)
 
+## バージョン 2.0 (2026-09-12)
+
+*注: このバージョンでは、バックフィルシステムの改善、品質メトリクスの拡張、認証・課金システムの完成、GEPSライブテスト基盤、検索APIマイクロサービスが追加されました。*
+
 ## 📖 概要
 このプロジェクトは、官公庁・自治体が公開する入札情報（PDF・HTML）を自動で取得し、LLM（Large Language Model）と OCR（光学文字認識）を組み合わせて必須要件（予算、資格要件、納期、成果物等）を抽出・正規化・可視化するエンドツーエンドシステムです。
 
 **主な拡張機能**
 - **クローラ基盤**：`BaseCrawler`／`ConfigDrivenCrawler` による汎用的な URL 取得・ページ遷移（Pagination）
+- **日付範囲指定クロール**：全クローラーに `start_date`/`end_date` パラメータ追加により過去データのバックフィル取得を実現
 - **企業名正規化**：`services/company_normalizer.py` と `config/company_normalization_rules.py` による表記揺れ統一・業種推定
 - **優先度マトリクス**：`CrawlPriority` モデルとスコアリングロジックで都道府県別・業種別のクロール優先度を算出
 - **競合分析ダッシュボード**：競合企業の落札件数・勝率・監視対象フラグを可視化（`app_dashboard.py` → 競合分析タブ）
@@ -12,6 +17,14 @@
 - **品質メトリクス**：欠損フィールド、重複、カバレッジ率、日次変化量を自動計測し、しきい値超過時に Slack/LINE 通知（`services/quality_metrics_service.py`、`services/quality_alert_service.py`）
 - **高度なアラート機構**：システムヘルスチェック、コンポーネント障害の連続検知、競合出現アラート、品質警告・アラート
 - **スケジューラ統合**：APScheduler によりクロール・健康チェック・朝のダイジェスト・品質メトリクス収集・落札結果クローラを自動実行（`scheduler.py`）
+- **バックフィルシステム**：過去データ遡及取得ジョブ管理、`BackfillJob`/`BackfillJobLog` モデル、重複排除・データ品質向上サービス
+- **認証・課金システム**：Stripe連携によるプラン管理（Free/Standard/Pro/Enterprise）、機能制限・無料トライアル、顧客ポータル
+- **予測機能**：入札結果予測ダッシュボード、予測リストビュー、予測データ取得・解析モジュール
+- **カンバンボード**：タスク管理ビューとしてのカンバンボード実装
+- **システム観測性**：リアルタイムシステムメトリクス・ログ監視ダッシュボード
+- **入札履歴ビュー**：過去の入札データを時系列で閲覧・検索可能なビュー
+- **GEPSライブテスト**：本番環境でのGEPSシステム連携テストインフラストラクチャ（自動レポート生成、Slack/LINE通知、GitHub Actions連携）
+- **検索APIマイクロサービス**：資格認証・検索機能を提供する独立したAPIサービス
 - **UI 改善**：管理画面に QA、しきい値、システム設定タブ追加、ダッシュボードにデータ品質タブ、カスタム CSS (`static/css/custom_dashboard.css`)
 - **テスト・CI**：ユニットテストが 21 件全て成功、`pytest`・`py_compile` による自動検証
 
@@ -19,6 +32,8 @@
 | カテゴリ | 機能 | 実装ファイル／モジュール |
 |---|---|---|
 | **データ取得** | 自動巡回クローラ（HTML・PDF） | `crawler/`, `scripts/` |
+| **日付範囲指定取得** | 指定期間の入札情報を遡及取得 | `crawler/base_crawler.py`, `services/backfill_service.py` |
+| **予測データ取得** | 入札結果予測データの収集・解析 | `crawler/forecast_base_crawler.py`, `crawler/downloaders/forecast_downloader.py` |
 | **テキスト抽出** | OCR（Tesseract / Azure）| `ocr/` |
 | **LLM 解析** | 仕様書要件抽出・業種推定 | `services/`（LLM 関連） |
 | **正規化** | 企業名正規化・業種マッピング | `services/company_normalizer.py` |
@@ -27,10 +42,21 @@
 | **品質管理** | 欠損・重複チェック・メトリクス収集 | `services/award_quality_checker.py`、`services/quality_metrics_service.py` |
 | **アラート** | ヘルスチェック、競合出現、品質警告 | `services/alert_manager.py`、`services/competitor_alert_service.py`、`services/quality_alert_service.py` |
 | **人手レビュー** | QA レビュー割当・承認・修正 | `services/qa_assignment_service.py`、`services/qa_fix_pipeline.py` |
-| **可視化** | Streamlit ダッシュボード（KPI・分析・競合・データ品質） | `app_dashboard.py` |
-| **管理 UI** | Flask 管理画面（組織・ユーザー・ロール・優先度・インベントリ・QA・しきい値） | `app_admin.py` |
-| **スケジューラ** | 定期ジョブ（クロール、健康チェック、品質収集、朝ダイジェスト） | `scheduler.py` |
-| **ユーティリティ** | ログ、認証、CSV/JSON エクスポート、iCal 出力 | `utils/`、`services/*_exporter.py` |
+| **バックフィル管理** | 過去データ取得ジョブ管理・重複排除・データ品質向上 | `services/backfill_service.py`, `services/backfill_dedup.py`, `app_admin.py`（バックフィルタブ） |
+| **認証・課金** | ユーザー認証・Stripe決済・プラン管理・機能制限 | `app_billing.py`, `app_webhook.py`, `services/billing_service.py`, `utils/auth_decorator.py`, `utils/plan_gate.py`, `utils/stripe_client.py` |
+| **API使用量管理** | 月間APIリクエスト制限・トラッキング | `services/api_usage.py`, `database/models/api_usage.py` |
+| **予測機能** | 入札結果予測ダッシュボード・リストビュー | `app_forecast_dashboard.py`, `app_forecast_list.py` |
+| **タスク管理** | カンバンボードビュー | `app_kanban.py` |
+| **システム観測性** | リアルタイムメトリクス・ログ監視ダッシュボード | `app_observability.py` |
+| **入札履歴** | 過去入札データの閲覧・検索ビュー | `app_history.py` |
+| **GEPSライブテスト** | 本番環境連携テストインフラストラクチャ | `tests/test_geps_live/`, `scripts/test_geps_live.py` |
+| **検索API** | 資格認証・検索マイクロサービス | `search_api/main.py`, `search_api/qualification_api.py` |
+| **可視化** | Streamlit ダッシュボード（KPI・分析・競合・データ品質・予測・観測性等） | `app_dashboard.py`, `app_forecast_dashboard.py`, `app_observability.py` |
+| **管理 UI** | Flask 管理画面（組織・ユーザー・ロール・優先度・インベントリ・QA・バックフィル・しきい値） | `app_admin.py` |
+| **スケジューラ** | 定期ジョブ（クロール、健康チェック、品質収集、朝ダイジェスト、バックフィル） | `scheduler.py` |
+| **キューイング** | タスクキューイングシステム | `job_queue/` |
+| **設定管理** | YAMLベース設定管理・品質閾値設定 | `config/quality_thresholds.yaml`, `config/sample_detail_fields.yaml` |
+| **ユーティリティ** | ログ、認証、CSV/JSON エクスポート、iCal 出力、レートリミッティング、セキュリティ | `utils/`、`services/*_exporter.py` |
 
 ## 🛠️ セットアップ
 ### 1. 必要環境
@@ -65,8 +91,21 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz
 LINE_CHANNEL_ACCESS_TOKEN=your_line_token
 LINE_USER_ID=your_line_user_id
 
+# Stripe 認証・課金
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_STANDARD=price_standard_id
+STRIPE_PRICE_PRO=price_pro_id
+STRIPE_PRICE_ENTERPRISE=price_enterprise_id
+STRIPE_SUCCESS_URL=http://localhost:8501/billing/success
+STRIPE_CANCEL_URL=http://localhost:8501/billing/cancel
+STRIPE_PORTAL_URL=http://localhost:8501/billing/portal
+
 # アプリケーション設定（例）
 QUEUE_ALERT_THRESHOLD=100   # Redis キュー深さ閾値
+```
+> 設定が不足している項目はアプリ起動時に警告が表示されます。
 ```
 > 設定が不足している項目はアプリ起動時に警告が表示されます。
 
@@ -93,11 +132,21 @@ streamlit run app_dashboard.py
 python app_admin.py
 # http://localhost:5000 にアクセス
 ```
-### 4. 自動巡回クローラ（全自治体取得）
+### 4. 課金・プラン管理 UI
+```bash
+streamlit run app_billing.py
+# 認証後、サイドバーの「💳 プラン・請求」からもアクセス可能
+```
+### 5. Stripe Webhook エンドポイント
+```bash
+# 別ターミナルで実行（開発時）
+uvicorn app_webhook:app --host 0.0.0.0 --port 8000
+```
+### 6. 自動巡回クローラ（全自治体取得）
 ```bash
 python main.py   # 設定された CrawlConfig に従い HTML / PDF を取得し DB に保存
 ```
-### 5. スケジューラ（バックグラウンドジョブ）
+### 7. スケジューラ（バックグラウンドジョブ）
 ```bash
 python - <<'PY'
 from scheduler import scheduler_manager
@@ -109,8 +158,9 @@ PY
 > - ヘルスチェック・アラート（1 分）
 > - 品質メトリクス収集（毎日）
 > - 朝のダイジェスト通知（毎日 08:00）
-
-### 6. 品質メトリクス収集・評価（手動実行例）
+> - バックフィルジョブ（週1回、日曜深夜）
+>
+### 8. 品質メトリクス収集・評価（手動実行例）
 ```bash
 # メトリクス収集
 python scripts/collect_quality_metrics.py
@@ -119,46 +169,217 @@ python scripts/collect_quality_metrics.py
 python scripts/evaluate_quality_alerts.py
 ```
 
+### 9. GEPSライブテスト実行（本番環境検証）
+```bash
+# 基本実行（全テスト、デフォルトパス使用）
+python tests/test_geps_live/scripts/run_live_tests.py
+
+# 特定フェーズのみ実行
+python tests/test_geps_live/scripts/run_live_tests.py --phase 1-10
+
+# 本番アクセスをスキップ（CI/ローカル検証用）
+python tests/test_geps_live/scripts/run_live_tests.py --no-live
+
+# 並列実行（xdist使用、autoでCPUコア数自動検出）
+python tests/test_geps_live/scripts/run_live_tests.py --xdist auto
+
+# 明示的なワーカー数指定
+python tests/test_geps_live/scripts/run_live_tests.py --xdist 4
+
+# タイムアウト設定（秒、デフォルト300秒）
+python tests/test_geps_live/scripts/run_live_tests.py --timeout 300
+
+# 対象自治体リストのカスタマイズ
+python tests/test_geps_live/scripts/run_live_tests.py --targets tests/test_geps_live/targets.yaml
+
+# レポート出力先指定
+python tests/test_geps_live/scripts/run_live_tests.py --report reports/my_live_test.md
+
+# 組み合わせ例：CI想定
+python tests/test_geps_live/scripts/run_live_tests.py --phase 1-10 --xdist auto --timeout 300 --no-live --report reports/ci_report.md
+```
+
+**主要オプション:**
+| オプション | 説明 | デフォルト |
+|---|---|---|
+| `--test-path` | テストディレクトリパス | `tests/test_geps_live` |
+| `--phase` | 実行フェーズ範囲 (開始-終了) | 全フェーズ |
+| `--no-live` | 本番アクセススキップ (`GEPS_SKIP_LIVE=true`) | false |
+| `--report` | Markdownレポート出力パス | `reports/live-test_<timestamp>.md` |
+| `--targets` | 対象自治体YAMLパス | `test_path/targets.yaml` |
+| `--xdist` | 並列ワーカー数 (`auto` または整数) | なし(直列) |
+| `--timeout` | テストタイムアウト秒数 | 300 |
+| `--no-json-report` | JSONレポート出力無効化 | false |
+
+**環境変数:**
+| 変数 | 説明 |
+|---|---|
+| `GEPS_LIVE_URL` | GEPS本番URL | `https://www.geps.go.jp` |
+| `GEPS_TEST_TIMEOUT` | 個別テストタイムアウト | 30秒 |
+| `GEPS_SKIP_LIVE` | 本番テストスキップ | 未設定 |
+| `DEEPSEEK_API_KEY` | LLM APIキー (必須) | - |
+| `GEMINI_API_KEY` | LLM APIキー (必須) | - |
+| `GEPS_DEFAULT_TIMEOUT` | デフォルトテストタイムアウト | 300秒 |
+| `GEPS_DEFAULT_RERUNS` | flakyリトライ回数 | 2回 |
+| `GEPS_DEFAULT_RERUNS_DELAY` | リトライ間隔秒数 | 10秒 |
+
+**レポート成果物:**
+- Markdown サマリ: `--report` で指定したパス
+- JSON 詳細レポート: Markdown と同名の `.json` ファイル
+- 失敗時の一時ディレクトリ: 自動保持 (成功時は自動削除)
+
+**GitHub Actions での定期実行:**
+- `.github/workflows/live-tests.yml` で毎週月曜 3:00 (JST) に自動実行
+- 手動実行も `workflow_dispatch` で可能 (フェーズ指定、並列数、スキップ等調整可能)
+- アーティファクトとして Markdown/JSON レポートを 30 日間保存
+- Slack 通知連携対応 (`SLACK_WEBHOOK_URL` シークレット必須)
+
+**主要な pytest マーカー・機能:**
+- `@pytest.mark.live_test`: 本番テスト識別
+- `@pytest.mark.timeout(秒)`: テストタイムアウト (デフォルト 300 秒)
+- `@pytest.mark.flaky(reruns=2, reruns_delay=10)`: 失敗時自動リトライ
+- `@pytest.mark.integration`: 統合テスト識別
+- `live_test_dir` fixture: ワーカー別一時ディレクトリ (失敗時保持)
+- `prefecture`/`city` fixture: `targets.yaml` から自動パラメータライズ
+
 ## 📂 ディレクトリ構成（概要）
 ```
 .
 ├─ app.py                     # Streamlit – PDF 1 件抽出 UI
 ├─ app_dashboard.py           # Streamlit – 全体分析・競合・データ品質 UI
 ├─ app_admin.py               # Flask 管理画面（ユーザー・ロール・QA など）
+├─ app_billing.py             # Streamlit – 課金・プラン管理 UI
+├─ app_forecast_dashboard.py  # Streamlit – 予測ダッシュボード
+├─ app_forecast_list.py       # Streamlit – 予測リストビュー
+├─ app_history.py             # Streamlit – 入札履歴ビュー
+├─ app_kanban.py              # Streamlit – カンバンボード
+├─ app_observability.py       # Streamlit – システム観測性ダッシュボード
+├─ app_webhook.py             # FastAPI – Stripe Webhook エンドポイント
+├─ backfill_investigation_report.md  # バックフィル調査レポート
+├─ backfill_error_handling_policy.md # バックフィルエラーハンドリング方針
+├─ command/                   # カスタム管理コマンド
 ├─ config.py                  # アプリ共通設定（KPI、スケジューラ、DB パス）
-├─ requirements.txt           # Python 依存パッケージ
-├─ .env                       # 環境変数（API キー・Webhook）
-├─ database/
-│   ├─ models/               # SQLAlchemy ORM モデル（Bid, AwardResult, QAReview …）
-│   └─ repositories/         # データアクセス層（CRUD）
+├─ config/                    # 設定ファイル群
+│   ├─ quality_thresholds.yaml    # 品質閾値設定
+│   ├─ sample_detail_fields.yaml  # 詳細項目サンプル設定
+│   └─ ...                      # その他のYAML設定
+├─ config_old/                # 旧設定ファイル（移行中）
 ├─ crawler/
-│   ├─ base_crawler.py       # 汎用クローラ基底クラス
+│   ├─ base_crawler.py        # 汎用クローラ基底クラス（日付範囲指定対応）
 │   ├─ config_driven_crawler.py
-│   ├─ agency_lists/ …       # 各自治体向けリスト取得クラス
-│   └─ parsers/ …            # HTML / PDF パーサ
-├─ ocr/                       # OCR ライブラリ・ユーティリティ（Tesseract, Azure）
-├─ services/
-│   ├─ company_normalizer.py  # 企業名正規化・業種判定
-│   ├─ priority_scorer.py    # 優先度スコア計算
-│   ├─ qa_assignment_service.py
-│   ├─ qa_fix_pipeline.py
-│   ├─ quality_metrics_service.py
-│   ├─ quality_alert_service.py
-│   ├─ alert_manager.py
-│   ├─ competitor_alert_service.py
-│   ├─ award_quality_checker.py
-│   ├─ … (その他ビジネスロジック)
-├─ scripts/
+│   ├─ generic_crawler.py     # 汎用クローラー（カテゴリ・優先度フィルタ対応）
+│   ├─ geps_crawler.py        # GEPS クローラー（全省庁対応）
+│   ├─ geps_crawler_updated.py # GEPS クローラー（更新版）
+│   ├─ award_list_crawler.py  # 落札結果一覧取得クローラー
+│   ├─ forecast_base_crawler.py # 予測データ取得ベースクローラー
+│   ├─ downloaders/           # ダウンローダー群
+│   │   └─ forecast_downloader.py # 予測データダウンローダー
+│   ├─ geps/                  # GEPS専用モジュール
+│   │   └─ award_crawler.py   # GEPS 落札結果取得クローラー
+│   ├─ parsers/               # パーサーモジュール群
+│   │   ├─ award_parser.py    # 落札結果HTMLパーサー
+│   │   ├─ award_pdf_parser.py # 落札結果PDFパーサー
+│   │   ├─ forecast_html_parser.py # 予測データHTMLパーサー
+│   │   ├─ html_pattern_detector.py # HTMLパターン検出器
+│   │   ├─ config_auto_updater.py # 設定自動更新器
+│   │   ├─ field_normalizer.py  # フィールド正規化ユーティリティ
+│   │   └─ ...                # その他のパーサー
+│   ├─ registry/              # URL レジストリシステム
+│   │   ├─ prefecture_registry.py
+│   │   ├─ city_registry.py
+│   │   └─ municipality_registry.py
+│   ├─ patterns/              # パターンライブラリ
+│   │   └─ prefectures/       # 都道府県別パターン
+│   ├─ utils/                 # クローラユーティリティ
+│   │   ├─ date_filter.py     # 日付範囲フィルタ
+│   │   ├─ date_parser.py     # 日付パース（和暦・西暦両対応）
+│   │   └─ selector_validator.py # セレクタバリデータ
+│   └─ config/                # 設定駆動クローラー設定
+│       └─ ...                # 各機関別設定ファイル
+├─ data/                      # データファイル群
+├─ database/
+│   ├─ models/               # SQLAlchemy ORM モデル（Bid, AwardResult, QAReview, BackfillJob, BackfillJobLog, ApiUsage, QualityAlert …）
+│   ├─ config/               # データベース設定
+│   ├─ repositories/         # データアクセス層（CRUD）
+│   └─ seeders/              # 初期データ投入スクリプト
+│       ├─ qualification_tag_seeder.py
+│   │   └─ qualification_tags.csv # 資格タグマスタデータ
+├─ events/                   # イベント処理（Redis Pub/Sub）
+│   ├─ redis_publisher.py
+│   └─ redis_subscriber.py
+├─ job_queue/                # キューイングシステム（RQ置き換え）
+├─ logs/                     # ログファイル出力先
+├─ ocr/                      # OCR ライブラリ・ユーティリティ（Tesseract, Azure）
+├─ plans/                    # 実装計画書群
+│   ├─ IMPLEMENTATION_PLAN_P1.md    # フェーズ1実装計画
+│   ├─ IMPLEMENTATION_PLAN_P2.md    # フェーズ2実装計画
+│   ├─ IMPLEMENTATION_PLAN_P3.md    # フェーズ3実装計画
+│   ├─ IMPLEMENTATION_PLAN_48STEPS.md # 48ステップ実装計画
+│   ├─ IMPLEMENTATION_PLAN_TEST_COVERAGE.md # テストカバレッジ計画
+│   └─ CODE_REVIEW.md       # コードレビューガイド
+├─ requirements.txt          # Python 依存パッケージ
+├─ reports/                  # テストレポート出力先
+├─ scheduler.py              # APScheduler 設定・ジョブ定義（バックフィルジョブ対応）
+├─ scripts/                  # ユーティリティスクリプト群
 │   ├─ seed_agency_inventory.py
 │   ├─ collect_quality_metrics.py
 │   ├─ evaluate_quality_alerts.py
-│   └─ … (ユーティリティスクリプト)
+│   ├─ seed_backfill_jobs.py          # バックフィルジョブ初期投入スクリプト
+│   ├─ check_backfill_integrity.py    # バックフィル整合性チェック
+│   ├─ gen_backfill_quality_report.py # バックフィル品質レポート生成
+│   ├─ gen_crawler.py         # クローラー自動生成スクリプト
+│   ├─ integration_test.py    # 統合テストスクリプト
+│   ├─ verify_env.py          # 環境変数検証スクリプト
+│   ├─ crawl_all_prefectures.py # 全都道府県クロールスクリプト
+│   ├─ test_geps_live.py      # GEPSライブテスト実行スクリプト
+│   ├─ seed_quality_thresholds.py # 品質閾値初期投入スクリプト
+│   └─ ...                    # その他のユーティリティスクリプト
+├─ search_api/               # 検索APIマイクロサービス
+│   ├─ main.py                # エントリーポイント
+│   └─ qualification_api.py   # 資格認証API
 ├─ static/css/custom_dashboard.css   # ダッシュボード用カスタムテーマ
-├─ tests/
+├─ tests/                    # テスト群
 │   ├─ unit/                  # ユニットテスト（全部 21 件合格）
-│   └─ …
-└─ scheduler.py               # APScheduler 設定・ジョブ定義
+│   ├─ test_backfill_service.py       # バックフィルサービステスト
+│   ├─ test_backfill_dedup.py         # 重複排除テスト
+│   ├─ test_date_range_crawl.py       # 日付範囲フィルタテスト
+│   ├─ test_backfill_pipeline.py      # バックフィルパイプラインテスト
+│   ├─ test_geps_live/                # GEPSライブテスト群
+│   │   ├─ conftest.py
+│   │   ├─ scripts/
+│   │   │   └─ run_live_tests.py      # ライブテストランナー
+│   │   ├─ targets.yaml               # 対象自治体リスト
+│   │   └─ ...                        # その他のライブテストファイル
+│   ├─ test_forecast_dedup_service.py # 予測データ重複排除テスト
+│   ├─ test_forecast_html_parser.py   # 予測データHTMLパーサーテスト
+│   ├─ integration/                   # 統合テスト群
+│   │   ├─ test_qualification_normalizer_integration.py
+│   │   └─ test_quality_metrics_alert_flow.py
+│   ├─ repositories_backup/           # リポジトリテストバックアップ
+│   └─ unit/                          # ユニットテスト詳細
+│       ├─ test_auth_service.py
+│   │   ├─ test_kanban_service.py
+│   │   ├─ test_milestone_service.py
+│   │   ├─ test_price_prediction_service.py
+│   │   ├─ test_qualification_normalizer.py
+│   │   ├─ test_qualification_tag_seeder.py
+│   │   ├─ test_saved_search_service.py
+│   │   ├─ test_qualification_matcher.py
+│   │   ├─ test_config_driven_crawler.py
+│   │   ├─ test_crawl_tasks.py
+│   │   ├─ test_import_debug.py
+│   │   ├─ test_geps_selectors.py
+│   │   ├─ test_llm_service.py
+│   │   ├─ test_quality_metrics_service.py
+│   │   └─ ...                        # その他のユニットテスト
+└─ utils/                    # ユーティリティモジュール群
+    ├─ rate_limiter.py       # レートリミッター
+    ├─ security.py           # セキュリティユーティリティ
+    ├─ stripe_client.py      # Stripe APIラッパー
+    └─ ...                   # その他のユーティリティ
 ```
+
+
 
 ## 🧪 テスト・品質保証
 ```bash

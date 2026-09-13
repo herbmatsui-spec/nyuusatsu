@@ -2,7 +2,7 @@ import os
 import re
 import logging
 from typing import Any, Dict, Optional
-from config import AppConfig
+from config_dir import AppConfig
 from urllib.parse import urlparse
 
 def validate_file_upload(uploaded_file: Any, max_size_mb: int = 20) -> Optional[str]:

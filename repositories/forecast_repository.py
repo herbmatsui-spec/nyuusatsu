@@ -31,9 +31,9 @@ class ForecastRepository:
     def get_active(self, limit: int = 500) -> List[ProcurementForecast]:
         return self.session.query(ProcurementForecast).filter(
             or_(
-                ProcurementForecast.status == ForecastStatusEnum.DRAFT.value,
-                ProcurementForecast.status == ForecastStatusEnum.PUBLISHED.value,
-                ProcurementForecast.status == ForecastStatusEnum.UPDATED.value,
+                ProcurementForecast.status == "draft",
+                ProcurementForecast.status == "published",
+                ProcurementForecast.status == "updated",
             )
         ).order_by(desc(ProcurementForecast.created_at)).limit(limit).all()
 

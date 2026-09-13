@@ -47,11 +47,12 @@ class KanbanService:
         return board
 
     def assign_user(self, bid_id: int, user_id: str, role: str = "member") -> BidAssignment:
-        return self.assignment_repo.create({
-            "bid_id": bid_id,
-            "user_id": user_id,
-            "role": role,
-        })
+        return self.assignment_repo.create(
+            bid_id=bid_id,
+            user_id=user_id,
+            role=role,
+            assigned_at=datetime.utcnow(),
+        )
 
     def unassign_user(self, bid_id: int, user_id: str) -> None:
         assignments = self.assignment_repo.get_by_bid(bid_id)

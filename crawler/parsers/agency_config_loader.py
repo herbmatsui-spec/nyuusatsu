@@ -24,24 +24,25 @@ class AgencyConfigLoader:
     def load(self, agency_name: str) -> Dict[str, Any]:
         """
         自治体名に基づいて設定を読み込む。
-        現状、ehime.json に集約しているため、ファイル内を検索する。
+        設定ディレクトリおよびそのサブディレクトリ内の全JSONファイルを検索する。
         """
         if agency_name in self.cache:
             return self.cache[agency_name]
 
-        # 設定ファイルのリストを取得して、全JSONを走査して agency_name を探す
         try:
             if not os.path.exists(self.config_dir):
                 return self.default_config
 
-            for filename in os.listdir(self.config_dir):
-                if filename.endswith(".json"):
-                    with open(os.path.join(self.config_dir, filename), 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        if agency_name in data:
-                            config = data[agency_name]
-                            self.cache[agency_name] = config
-                            return config
+            for root, dirs, files in os.walk(self.config_dir):
+                for filename in files:
+                    if filename.endswith(".json"):
+                        filepath = os.path.join(root, filename)
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            if agency_name in data:
+                                config = data[agency_name]
+                                self.cache[agency_name] = config
+                                return config
         except Exception as e:
             print(f"Error loading agency config for {agency_name}: {e}")
 

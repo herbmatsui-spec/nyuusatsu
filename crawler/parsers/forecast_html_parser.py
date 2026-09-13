@@ -12,6 +12,10 @@ class ForecastHtmlParser(BaseParser):
     def __init__(self):
         self.logger = ForecastLogger("HtmlParser")
 
+    def extract_fields(self, raw_text: str) -> dict:
+        """BaseParserの抽象メソッドを実装。このパーサーでは使用しない。"""
+        raise NotImplementedError("ForecastHtmlParser uses parse() method instead of extract_fields()")
+
     def parse(self, html: str, base_url: str, agency_name: str = "不明") -> List[Dict[str, Any]]:
         return self.extract_tables(html, base_url)
 

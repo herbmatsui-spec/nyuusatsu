@@ -104,17 +104,45 @@ def notify_quality_issue(metric_name: str, value: float, level: str = "warn") ->
         except Exception as e:
             logging.error(f"{notify_type} 通知失敗: {e}")
     return False
-    """Formats a list of new bids into a readable message
-    """
-    if not bids:
-        return "新規案件は見つかりませんでした。"
+
+
+def notify_backfill_done(job_id: int, agency_name: str, fetched_count: int, new_count: int, updated_count: int, status: str, duration_sec: float = None) -> bool:
+    """バックフィルジョブ完了通知"""
+    status_icon = "✅" if status == "done" else "❌"
+    status_text = "完了" if status == "done" else "失敗"
     
-    message = "🔔 【新着案件通知】\n"
-    message += f"合計 {len(bids)} 件の新規案件を検出しました。\n\n"
+    message = f"{status_icon} 【バックフィル{status_text}】\n"
+    message += f"ジョブID: {job_id}\n"
+    message += f"機関: {agency_name}\n"
+    message += f"取得: {fetched_count:,} 件\n"
+    message += f"新規: {new_count:,} 件\n"
+    message += f"更新: {updated_count:,} 件\n"
+    if duration_sec:
+        message += f"所要時間: {duration_sec:.1f} 秒\n"
     
-    for i, bid in enumerate(bids, 1):
-        title = bid.get('title', '無題')
-        url = bid.get('url', '#')
-        message += f"{i}. {title}\n{url}\n\n"
+    for notify_type in ("slack", "line"):
+        try:
+            service = create_notification_service(notify_type)
+            if service.send(message):
+                return True
+        except Exception as e:
+            logging.error(f"{notify_type} 通知失敗: {e}")
+    return False
+
+
+def notify_backfill_error(job_id: int, agency_name: str, error_message: str) -> bool:
+    """バックフィルジョブエラー通知"""
+    message = f"🔴 【バックフィルエラー】\n"
+    message += f"ジョブID: {job_id}\n"
+    message += f"機関: {agency_name}\n"
+    message += f"エラー: {error_message}\n"
+    message += "要確認・対応が必要です。"
     
-    return message
+    for notify_type in ("slack", "line"):
+        try:
+            service = create_notification_service(notify_type)
+            if service.send(message):
+                return True
+        except Exception as e:
+            logging.error(f"{notify_type} 通知失敗: {e}")
+    return False

@@ -4,7 +4,7 @@ from typing import List
 from sqlalchemy import text
 from database.engine import get_session
 from services.crawl_scheduler import CrawlScheduler
-from config import AppConfig
+from config_dir import AppConfig
 
 # ロギング設定
 logging.basicConfig(

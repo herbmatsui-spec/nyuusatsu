@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, List
 from playwright.async_api import async_playwright
 from crawler.parsers.llm_structure_analyzer import LLMStructureAnalyzer
 from crawler.parsers.prefecture_template_loader import PrefectureTemplateLoader
-from config import AppConfig
+from config_dir import AppConfig
 
 logger = logging.getLogger(__name__)
 

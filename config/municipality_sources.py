@@ -1,6 +1,11 @@
-# 市区町村ごとの入札情報取得元 URL マッピング（必要に応じて追加）
-# 例: {"北海道": {"札幌市": "https://www.city.sapporo.jp/bid/", ...}}
+# 市区町村のポータルURL辞書
+# 構造: { 都道府県名: { 市区町村名: URL, ... }, ... }
+# 実際のデータは data/master/municipality_codes.csv などから生成することを想定
+
 MUNICIPALITY_SOURCES = {
-    # "prefecture_name": {"municipality_name": "url", ...}
-    # Add entries as data becomes available
+    # 例: "東京都": {
+    #     "千代田区": "https://www.city.chiyoda.lg.jp/",
+    #     "中央区": "https://www.city.chuo.lg.jp/",
+    # },
 }
+# 実際の運用では、データファイルから自動生成するスクリプトを用意すること

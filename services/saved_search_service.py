@@ -17,11 +17,15 @@ class SavedSearchService:
         self.bid_repo = BidRepository(session)
 
     def create(self, user_id: str, name: str, criteria: Dict[str, Any]) -> SavedSearch:
-        return self.repo.create({
-            "user_id": user_id,
-            "name": name,
-            "criteria_json": json.dumps(criteria, ensure_ascii=False),
-        })
+        now = datetime.utcnow()
+        return self.repo.create(
+            user_id=user_id,
+            name=name,
+            criteria_json=json.dumps(criteria, ensure_ascii=False),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
 
     def get_active_by_user(self, user_id: str) -> List[SavedSearch]:
         return self.repo.get_active_by_user(user_id)

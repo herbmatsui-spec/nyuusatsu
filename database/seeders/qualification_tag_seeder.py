@@ -7,7 +7,7 @@ import csv
 import os
 from typing import List, Optional
 
-DEFAULT_MASTER_CSV = os.path.join(os.path.dirname(__file__), "..", "config", "qualification_tags.csv")
+DEFAULT_MASTER_CSV = os.path.join(os.path.dirname(__file__), "qualification_tags.csv")
 
 
 def load_master_csv(path: Optional[str] = None) -> List[dict]:
@@ -37,13 +37,36 @@ def seed_qualification_tags(session) -> dict:
     rows = load_master_csv()
     inserted = 0
     for r in rows:
-        code = r.get("code") or r.get("id")
+        code = r.get("tag_code") or r.get("code") or r.get("id")
         if not code:
             continue
-        existing = session.query(QualificationTag).filter_by(code=code).first()
+        existing = session.query(QualificationTag).filter_by(tag_code=code).first()
         if existing:
             continue
-        tag = QualificationTag(**{k: v for k, v in r.items() if hasattr(QualificationTag, k)})
+        # Map CSV columns to model fields
+        tag_data = {}
+        if "tag_code" in r:
+            tag_data["tag_code"] = r["tag_code"]
+        elif "code" in r:
+            tag_data["tag_code"] = r["code"]
+        if "display_name" in r:
+            tag_data["display_name"] = r["display_name"]
+        elif "name" in r:
+            tag_data["display_name"] = r["name"]
+        if "category" in r:
+            tag_data["category"] = r["category"]
+        if "description" in r:
+            tag_data["description"] = r["description"]
+        if "grade_required" in r:
+            tag_data["grade_required"] = r["grade_required"]
+        if "region_required" in r:
+            tag_data["region_required"] = r["region_required"]
+        if "is_unified_qualification" in r:
+            val = r["is_unified_qualification"]
+            tag_data["is_unified_qualification"] = val in ("1", "true", "True", "yes", "yes")
+        if "compatible_grades" in r:
+            tag_data["compatible_grades"] = r["compatible_grades"]
+        tag = QualificationTag(**tag_data)
         session.add(tag)
         inserted += 1
     session.commit()

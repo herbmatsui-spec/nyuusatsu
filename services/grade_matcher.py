@@ -10,12 +10,25 @@ def extract_grade_from_text(text: str) -> Optional[str]:
     if not text:
         return None
     import re
-    m = re.search(r"[甲乙丙丁ABCDabcd][級级]?|[1-4][級级]?", text)
+    # First, try to match Kanji, alphabetic, or numeric grades with optional level marker (no space)
+    pattern1 = r"[甲乙丙丁ABCDabcd1-4][級级]?"
+    m = re.search(pattern1, text)
     if m:
-        return normalize_grade(m.group(0))
-    m = re.search(r"(A|B|C|D)\s*(?:級|级)", text, re.IGNORECASE)
+        matched = m.group(0)
+        # Map Kanji to letters
+        kanji_to_grade = {"甲": "A", "乙": "B", "丙": "C", "丁": "D"}
+        base = matched[0]
+        if base in kanji_to_grade:
+            return kanji_to_grade[base]
+        # For alphabetic and numeric, remove trailing "級" or "级" if present, then uppercase
+        if matched.endswith(("級", "级")):
+            matched = matched[:-1]
+        return matched.upper()
+    # Second, try to match alphabetic grade with possible space and level marker
+    pattern2 = r"(A|B|C|D)\s*(?:級|级)"
+    m = re.search(pattern2, text, re.IGNORECASE)
     if m:
-        return normalize_grade(m.group(1))
+        return m.group(1).upper()
     return None
 
 
@@ -39,3 +52,7 @@ def grade_matches(company_grade: Optional[str], bid_grade: Optional[str]) -> dic
         "can_apply": check_grade_requirement(company_grade, bid_grade),
         "compatible_grades": get_compatible_grades(normalize_grade(company_grade) if company_grade else None),
     }
+
+
+if __name__ == "__main__":
+    pass

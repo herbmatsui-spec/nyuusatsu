@@ -31,3 +31,20 @@ class RateLimiter:
         
         # アクセス時刻を更新
         self.last_access_times[domain] = time.time()
+
+    def throttle_sync(self, url: str, custom_delay: float = None) -> None:
+        """
+        Synchronous version of throttle.
+        """
+        domain = self._get_domain(url)
+        delay = custom_delay if custom_delay is not None else self.default_delay
+
+        last_time = self.last_access_times.get(domain)
+        if last_time is not None:
+            elapsed = time.time() - last_time
+            remaining = delay - elapsed
+            if remaining > 0:
+                time.sleep(remaining)
+
+        # アクセス時刻を更新
+        self.last_access_times[domain] = time.time()

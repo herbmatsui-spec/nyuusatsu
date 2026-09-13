@@ -1,0 +1,31 @@
+{
+  "北海道": {
+    "enabled": true,
+    "entry_url": "https://www.pref.hokkaido.lg.jp/ks/pps/index.html",
+    "url_includes": [
+      "/ks/pps/"
+    ],
+    "title_keywords": [
+      "入札",
+      "公告",
+      "調達",
+      "競争"
+    ],
+    "css_selectors": [
+      "a[href*='pdf']",
+      "a[href*='doc']"
+    ],
+    "requires_login": false,
+    "dynamic_strategy": "network_idle",
+    "notes": "北海道庁",
+    "max_depth": 2,
+    "link_keywords": [
+      "nyusatsu",
+      "sougou",
+      "hendou",
+      "ippann",
+      "oshirase",
+      "koukoku"
+    ]
+  }
+}

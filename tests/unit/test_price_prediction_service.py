@@ -15,6 +15,20 @@ from database.models.award_result import AwardResult
 
 
 @pytest.fixture
+def mock_llm_service():
+    """Mock LLMService to avoid API key requirements"""
+    with patch("services.price_prediction_service.LLMService") as mock:
+        mock_instance = MagicMock()
+        mock_instance.analyze_with_fallback.return_value = {
+            "expected_price": 1000000,
+            "win_probability": 0.5,
+            "rationale": "test"
+        }
+        mock.return_value = mock_instance
+        yield mock_instance
+
+
+@pytest.fixture
 def db_session():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
@@ -43,7 +57,7 @@ def test_win_rate_summary_with_data(db_session):
     assert result["median_award_rate"] == 0.85
 
 
-def test_price_prediction_not_found(db_session):
+def test_price_prediction_not_found(db_session, mock_llm_service):
     service = PricePredictionService(db_session)
     result = service.predict(9999, [], 1000000)
     assert "error" in result

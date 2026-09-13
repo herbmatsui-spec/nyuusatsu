@@ -48,7 +48,6 @@ class HTMLPatternDetector:
             # 1. IDがある場合は最優先
             if cand['id']:
                 selectors.append(f"#{cand['id']}")
-                continue
             
             # 2. classがある場合は class 組み合わせを作成
             if cand['class']:

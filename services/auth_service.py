@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from database.models.user import User
 from database.models.role import Role, UserRole
 from database.models.organization import Organization
-from config import AppConfig
+from config import AppConfig, PlanConfig
 
 
 class AuthService:
@@ -27,21 +27,38 @@ class AuthService:
         return user
 
     def create_user(self, username: str, password: str, org_id: Optional[int] = None, email: Optional[str] = None) -> User:
+        now = datetime.now(timezone.utc)
         user = User(
             username=username,
             email=email,
             password_hash=self._hash_password(password),
             org_id=org_id,
+            is_active=True,
+            created_at=now,
+            plan=PlanConfig.FREE,
+            trial_ends_at=now + timedelta(days=7),
+            subscription_status="trialing",
         )
         self.session.add(user)
         self.session.flush()
         return user
 
+    def load_user(self, user_id: str) -> Optional[User]:
+        """Flask-Login user loader."""
+        try:
+            return self.session.query(User).filter(User.id == int(user_id)).first()
+        except (ValueError, TypeError):
+            return None
+
+    def get_user_by_stripe_customer(self, customer_id: str) -> Optional[User]:
+        """Find user by Stripe customer ID."""
+        return self.session.query(User).filter(User.stripe_customer_id == customer_id).first()
+
     def create_token(self, user: User, expires_minutes: int = 60) -> str:
         payload = {
             "sub": str(user.id),
             "username": user.username,
-            "exp": datetime.utcnow() + timedelta(minutes=expires_minutes),
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=expires_minutes),
         }
         return jwt.encode(payload, "secret", algorithm="HS256")
 

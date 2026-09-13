@@ -1,0 +1,12 @@
+# 発注機関クローリング設定スキーマ（YAML）
+# 各機関ごとにパーサー種別・ページネーション・リンク抽出方法などを定義
+# 例:
+# agency_name: "北海道庁"
+# list_url: "https://www.pref.hokkaido.lg.jp/…/bid_list.html"
+# list_selector: "a.bid-link"
+# detail_selector: "div.detail"
+# pagination_selector: "a.next"
+# page_format: "html"
+# parser: "html"
+#
+# 実運用ではこのファイルを `scripts/gen_crawler.py` が自動生成する

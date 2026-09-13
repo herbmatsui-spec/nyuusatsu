@@ -5,7 +5,7 @@ import asyncio
 from typing import Optional, Dict, Any
 from pathlib import Path
 
-from config import AppConfig
+from config_dir import AppConfig
 from utils.forecast_logger import ForecastLogger
 
 

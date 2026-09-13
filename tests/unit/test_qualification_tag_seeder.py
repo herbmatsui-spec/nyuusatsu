@@ -4,8 +4,6 @@ from database.engine import SessionLocal
 from database.models import QualificationTag
 from database.seeders.qualification_tag_seeder import (
     seed_qualification_tags,
-    clear_qualification_tags,
-    show_qualification_tags,
     load_master_csv,
 )
 
@@ -28,7 +26,9 @@ def test_load_master_csv():
 
 def test_seed_inserts_all(session):
     """seed 実行で全レコードが挿入されること"""
-    clear_qualification_tags(session)
+    # Clear existing tags
+    session.query(QualificationTag).delete()
+    session.commit()
     stats = seed_qualification_tags(session)
     assert stats["inserted"] >= 23
 

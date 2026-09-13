@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>入札情報一覧 - テスト用</title>
+</head>
+<body>
+    <h1>入札公告一覧</h1>
+    <table class="bid-list">
+        <thead>
+            <tr>
+                <th>公告日</th>
+                <th>案件名</th>
+                <th>発注機関</th>
+                <th>予算額</th>
+                <th>締切日</th>
+                <th>詳細</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>2024-01-15</td>
+                <td>庁舎清掃業務委託</td>
+                <td>北海道庁</td>
+                <td>5,000,000円</td>
+                <td>2024-02-15</td>
+                <td><a href="/detail/001">詳細</a></td>
+            </tr>
+            <tr>
+                <td>令和6年2月1日</td>
+                <td>システム開発業務</td>
+                <td>札幌市</td>
+                <td>10,000,000円</td>
+                <td>2024-03-01</td>
+                <td><a href="/detail/002">詳細</a></td>
+            </tr>
+            <tr>
+                <td>2023/12/20</td>
+                <td>道路補修工事</td>
+                <td>函館市</td>
+                <td>3,000,000円</td>
+                <td>2024-01-20</td>
+                <td><a href="/detail/003">詳細</a></td>
+            </tr>
+            <tr>
+                <td>2024-03-10</td>
+                <td>備品購入</td>
+                <td>旭川市</td>
+                <td>1,500,000円</td>
+                <td>2024-04-10</td>
+                <td><a href="/detail/004">詳細</a></td>
+            </tr>
+            <tr>
+                <td>H31.4.1</td>
+                <td>古い案件（除外対象）</td>
+                <td>釧路市</td>
+                <td>2,000,000円</td>
+                <td>2019-05-01</td>
+                <td><a href="/detail/005">詳細</a></td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="pagination">
+        <a href="/list?page=1" class="current">1</a>
+        <a href="/list?page=2">2</a>
+        <a href="/list?page=3">3</a>
+        <a href="/list?page=2" class="next">次へ</a>
+    </div>
+</body>
+</html>

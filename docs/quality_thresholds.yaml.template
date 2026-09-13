@@ -1,0 +1,25 @@
+missing_field_rate:
+  warning: 5.0
+  critical: 15.0
+duplicate_rate:
+  warning: 1.0
+  critical: 5.0
+acquisition_delay_median:
+  warning: 60.0  # 分
+  critical: 1440.0  # 分 (24時間)
+coverage_rate:
+  warning: 95.0
+  critical: 90.0
+  lower_is_worse: true
+coverage_municipality_rate:
+  warning: 80.0
+  critical: 70.0
+  lower_is_worse: true
+geps_crawler_success_rate:
+  warning: 95.0
+  critical: 90.0
+  lower_is_worse: true
+geps_selector_match_rate:
+  warning: 80.0
+  critical: 70.0
+  lower_is_worse: true

@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, jsonify
 from services.cost_manager import CostManager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, timezone
 
 cost_bp = Blueprint('cost_dashboard', __name__)
 
@@ -14,7 +14,7 @@ def get_usage_data():
     data = []
     # 直近30日のデータを取得
     for i in range(30, -1, -1):
-        date_str = (datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d")
+        date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
         usage = cost_manager.get_daily_usage(date_str)
         data.append({
             "date": usage["date"],

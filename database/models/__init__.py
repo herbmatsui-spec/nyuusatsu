@@ -2,6 +2,7 @@
 from ._generated import Base
 from ._generated import Agency as Agency
 from ._generated import AgencyCategory as AgencyCategory
+from ._generated import AgencyInventory as AgencyInventory
 from ._generated import CrawlConfig as CrawlConfig
 from ._generated import AlertHistory as AlertHistory
 from ._generated import Competitor as Competitor
@@ -43,3 +44,21 @@ from ._generated import BidAssignment as BidAssignment
 from ._generated import NotificationChannel as NotificationChannel
 from ._generated import Favorite as Favorite
 from ._generated import CompetitorAlertConfig as ForecastAlertConfig
+from ._generated import BackfillJob as BackfillJob
+from ._generated import BackfillJobStatus as BackfillJobStatus
+from ._generated import BackfillJobLog as BackfillJobLog
+
+from .quality_metric import QualityMetric as QualityMetric
+from .quality_threshold import QualityThreshold as QualityThreshold
+from .quality_alert import QualityAlert as QualityAlert
+from .quality_metric import Base as QualityMetricBase
+from .quality_threshold import Base as QualityThresholdBase
+from .quality_alert import Base as QualityAlertBase
+from .crawler_schedule import CrawlerSchedule as CrawlerSchedule
+
+_quality_bases = (QualityMetricBase, QualityThresholdBase, QualityAlertBase)
+
+
+def create_all_quality_tables(bind):
+    for base in _quality_bases:
+        base.metadata.create_all(bind=bind)

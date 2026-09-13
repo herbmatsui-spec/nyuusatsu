@@ -1,13 +1,13 @@
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 from crawler.base_crawler import BaseCrawler
 from crawler.utils.user_agent import get_random_user_agent
 from crawler.utils.proxy_manager import ProxyManager
 from crawler.utils.rate_limiter import RateLimiter
-from config import AppConfig
+from config_dir import AppConfig
 from utils.forecast_logger import ForecastLogger
 
 
@@ -17,7 +17,7 @@ class ForecastBaseCrawler(BaseCrawler):
         delay: float = 3.0,
         timeout: int = 90000,
         categories: Optional[List[str]] = None,
-        priority_levels: Optional[List[int]] = None
+        priority_levels: Optional[List[Union[str, int]]] = None
     ):
         super().__init__(delay=delay, timeout=timeout, categories=categories, priority_levels=priority_levels)
         self.logger = ForecastLogger("BaseCrawler")

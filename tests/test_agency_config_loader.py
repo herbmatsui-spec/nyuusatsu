@@ -8,7 +8,7 @@ def test_load_existing_agency():
     
     assert config["enabled"] is True
     assert "入札" in config["title_keywords"]
-    assert "/shisei/shiseijoho/nyusatsu/" in config["url_includes"]
+    assert "/shisei/denshinyusatsu/jouhou/" in config["url_includes"]
 
 def test_load_non_existent_agency():
     # Load config for an agency not in any JSON

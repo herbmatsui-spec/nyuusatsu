@@ -1,52 +1,58 @@
 import csv
 import os
 
-def generate_municipality_code_list():
+def prepare_municipalities_for_import():
     """
-    全国の市区町村コード（地方公共団体コード）のダミー/構造を生成します。
-    実際には総務省のデータをインポートしますが、実装計画のステップ19として
-    構造を定義し、インポート準備を整えます。
+    fetch_municipality_codes.py の出力から、import_agencies.py 用の CSV を生成する。
+    - 都道府県（category=prefecture）は除外
+    - base_url は一旦空にする（後工程で設定）
+    - category は「市区町村」カテゴリ名を出力（import 側で category_id に変換）
+    - target_url, parser_type, frequency, is_active を追加
     """
-    # 実際には数千件になりますが、ここでは主要なサンプルを定義し、
-    # 形式を確定させます。
-    # 形式: municipality_code, prefecture_name, municipality_name, type (city/town/village)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_path = os.path.join(base_dir, "data", "master", "municipality_codes.csv")
+    output_path = os.path.join(base_dir, "data", "municipalities.csv")
+
+    if not os.path.exists(input_path):
+        print(f"Input file not found: {input_path}")
+        return
+
+    with open(input_path, "r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    print(f"Loaded {len(rows)} records from {input_path}")
+
+    # Filter out prefectures
+    municipalities = [r for r in rows if r.get("category") != "prefecture"]
+    print(f"Filtered to {len(municipalities)} municipalities (excluded prefectures)")
+
+    # Prepare output rows
+    output_rows = []
+    for row in municipalities:
+        output_rows.append({
+            "name": row["name"],
+            "type": row["type"],
+            "region": row["region"],
+            "base_url": "",  # 一旦空（後工程で設定）
+            "target_url": "",  # 後工程で設定
+            "parser_type": "heuristic",
+            "frequency": "daily",
+            "municipality_code": row["municipality_code"],
+            "category": "市区町村",  # import 側で category_id に変換
+            "is_active": "True",
+        })
+
+    # Write output
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fieldnames = ["name", "type", "region", "base_url", "target_url", "parser_type", "frequency", "municipality_code", "category", "is_active"]
     
-    municipalities = [
-        ["011001", "北海道", "札幌市", "city"],
-        ["021001", "青森県", "青森市", "city"],
-        ["031001", "岩手県", "盛岡市", "city"],
-        ["041001", "宮城県", "仙台市", "city"],
-        ["382001", "愛媛県", "松山市", "city"],
-        ["382002", "愛媛県", "今治市", "city"],
-        ["382003", "愛媛県", "宇和島市", "city"],
-        ["382004", "愛媛県", "八幡浜市", "city"],
-        ["382005", "愛媛県", "新居浜市", "city"],
-        ["382006", "愛媛県", "西条市", "city"],
-        ["382007", "愛媛県", "大洲市", "city"],
-        ["382008", "愛媛県", "伊予市", "city"],
-        ["382009", "愛媛県", "四国中央市", "city"],
-        ["382010", "愛媛県", "西予市", "city"],
-        ["382011", "愛媛県", "東温市", "city"],
-        ["384001", "愛媛県", "上島町", "town"],
-        ["384002", "愛媛県", "久万高原町", "town"],
-        ["384003", "愛媛県", "松前町", "town"],
-        ["384004", "愛媛県", "砥部町", "town"],
-        ["384005", "愛媛県", "内子町", "town"],
-        ["384006", "愛媛県", "伊方町", "town"],
-        ["384007", "愛媛県", "松野町", "town"],
-        ["384008", "愛媛県", "鬼北町", "town"],
-        ["384009", "愛媛県", "愛南町", "town"],
-    ]
+    with open(output_path, "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(output_rows)
 
-    file_path = "data/master_municipalities.csv"
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-    with open(file_path, 'w', encoding='utf-8-sig', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(["municipality_code", "prefecture_name", "municipality_name", "type"])
-        writer.writerows(municipalities)
-
-    print(f"Successfully created {file_path} with {len(municipalities)} entries.")
+    print(f"Successfully created {output_path} with {len(output_rows)} entries.")
 
 if __name__ == "__main__":
-    generate_municipality_code_list()
+    prepare_municipalities_for_import()
