@@ -11,8 +11,6 @@ def parse_budget_amount(text: str) -> Optional[int]:
     """「予定価格 12,345,678円」等から予定価格を数値で返す。"""
     if not text:
         return None
-    # Convert full-width digits to half-width
-    text = text.translate(str.maketrans({chr(0xFF10 + i): str(i) for i in range(10)}))
     cleaned = text.replace(",", "").replace("円", "").replace(" ", "").replace("\n", "")
     m = re.search(r"(\d+)", cleaned)
     if m:
@@ -36,12 +34,11 @@ def calculate_award_rate(budget: Optional[int], contract: Optional[int]) -> Opti
 
 
 def parse_date(text: str) -> Optional[datetime]:
-    """「令和5年4月1日」「2024/04/01」「2024-04-01」「2024.04.01」等をdatetimeに変換。"""
+    """「令和5年4月1日」「2024/04/01」「2024-04-01」等をdatetimeに変換。"""
     if not text:
         return None
-    text = text.strip()
     patterns = [
-        (r"(\d{4})\s*[年/.\-]\s*(\d{1,2})\s*[月/.\-]\s*(\d{1,2})日?", lambda m: datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))),
+        (r"(\d{4})\s*[年/\-]\s*(\d{1,2})\s*[月/\-]\s*(\d{1,2})日?", lambda m: datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))),
         (r"令和\s*(\d+|元)\s*年\s*(\d+)\s*月\s*(\d+)日?", lambda m: datetime(2018 + (1 if m.group(1) == '元' else int(m.group(1))), int(m.group(2)), int(m.group(3)))),
         (r"平成\s*(\d+|元)\s*年\s*(\d+)\s*月\s*(\d+)日?", lambda m: datetime(1988 + (1 if m.group(1) == '元' else int(m.group(1))), int(m.group(2)), int(m.group(3)))),
     ]
@@ -75,8 +72,9 @@ def extract_industry_from_text(text: str) -> Optional[str]:
         "IT": ["システム", "ソフトウェア", "ネットワーク", "データセンター", "クラウド"],
         "コンサル": ["コンサルティング", "調査", "計画", "設計"],
         "物品": ["物品", "備品", "機器", "設備", "用品"],
-        "委託": ["業務委託", "サービス", "業務"],
+        "委託": ["委託", "業務委託", "サービス", "業務"],
     }
+    lower = text.lower()
     for category, kws in keywords.items():
         for kw in kws:
             if kw in text:

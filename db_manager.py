@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from database.engine import get_session, engine
+from database.engine import get_session
 from database.models import CrawlHistory, CrawledUrl
 from database.repositories import (
     CrawlHistoryRepository,
@@ -12,10 +12,14 @@ from database.repositories import (
 
 logger = logging.getLogger(__name__)
 
-def init_db(eng=None):
+# Deprecated: Use database.engine.DATABASE_URL or database.session.get_session()
+DB_PATH = "data/crawl_history.db"
+
+
+def init_db(engine=None):
     """Initialize the database using SQLAlchemy engine."""
-    if eng is None:
-        eng = engine
+    if engine is None:
+        from database.engine import engine
     with get_session() as session:
         # Tables are already created via Alembic migrations
         logger.info("Database initialized successfully.")

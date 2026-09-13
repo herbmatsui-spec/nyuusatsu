@@ -1,39 +1,39 @@
 defaults:
-  channels:
-  - slack
-  - line
   dedup_ttl_hours: 24
+  channels:
+    - slack
+    - line
+
 metrics:
-  acquisition_delay_median:
-    critical: 4320.0
+  missing_field_rate:
+    warning: 50.0
+    critical: 80.0
     lower_is_worse: false
-    warning: 1440.0
-  coverage_rate:
-    critical: 10.0
-    lower_is_worse: true
-    warning: 20.0
-  daily_new:
-    critical: 0.0
-    lower_is_worse: true
-    warning: 0.0
-  daily_updated:
-    critical: 0.0
-    lower_is_worse: true
-    warning: 0.0
   duplicate_rate:
+    warning: 10.0
     critical: 25.0
     lower_is_worse: false
-    warning: 10.0
-  geps_crawler_success_rate:
-    critical: 80.0
-    lower_is_worse: true
-    warning: 90.0
-  geps_selector_match_rate:
-    critical: 80.0
-    lower_is_worse: true
-    warning: 90.0
-  missing_field_rate:
-    critical: 80.0
+  acquisition_delay_median:
+    warning: 1440.0
+    critical: 4320.0
     lower_is_worse: false
-    warning: 50.0
-scheduler_alert_threshold: 3
+  coverage_rate:
+    warning: 20.0
+    critical: 10.0
+    lower_is_worse: true
+  daily_new:
+    warning: 0.0
+    critical: 0.0
+    lower_is_worse: true
+  daily_updated:
+    warning: 0.0
+    critical: 0.0
+    lower_is_worse: true
+  geps_crawler_success_rate:
+    warning: 90.0
+    critical: 80.0
+    lower_is_worse: true
+  geps_selector_match_rate:
+    warning: 90.0
+    critical: 80.0
+    lower_is_worse: true

@@ -270,7 +270,6 @@ class SchedulerManager:
         )
         self.logger.info(f"Scheduled system health check job: {job_id} (Every 60s)")
 
-
     def _run_health_check(self):
         def _health_check():
             from services.health_checker import HealthChecker, HealthStatus
@@ -291,11 +290,8 @@ class SchedulerManager:
             
             scheduler_health = checker.check_scheduler()
             alert_manager.evaluate_and_alert("Scheduler", scheduler_health.status == HealthStatus.HEALTHY, scheduler_health.message)
-            
-            # パイプラインのヘルスチェックを追加
-            pipeline_health = checker.check_pipeline_recency()
-            alert_manager.evaluate_and_alert("PipelineRecency", pipeline_health.status == HealthStatus.HEALTHY, pipeline_health.message)
         self._safe_run_job("system_health_check_job", _health_check)
+
     def add_metrics_cleanup_job(self):
         """毎日午前4時に古いメトリクスを自動削除するジョブを追加"""
         job_id = "metrics_cleanup_job"

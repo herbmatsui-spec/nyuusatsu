@@ -5,7 +5,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
-from database.session import get_session
+from database.session import get_db
 from database.models.pipeline_metric import PipelineMetric
 from sqlalchemy import text
 
@@ -96,7 +96,7 @@ class HealthChecker:
     def check_database(self) -> ComponentHealth:
         """SQLite データベース接続と書き込みテストを行う"""
         try:
-            with get_session() as session:
+            with get_db() as session:
                 # 簡易クエリ実行
                 session.execute(text("SELECT 1")).first()
                 return ComponentHealth("Database", HealthStatus.HEALTHY)
@@ -125,7 +125,7 @@ class HealthChecker:
         """パイプラインが直近で動いているか（ハングや停止がないか）をメトリクスから確認する"""
         try:
             cutoff = datetime.utcnow() - timedelta(hours=24)
-            with get_session() as session:
+            with get_db() as session:
                 # 直近24時間以内に記録されたクロールまたは解析のメトリクスがあるか
                 recent_metric = session.query(PipelineMetric).filter(
                     PipelineMetric.timestamp >= cutoff,
@@ -153,7 +153,7 @@ class HealthChecker:
         """落札結果DBのデータ品質をチェックする"""
         try:
             from services.award_quality_checker import get_quality_report
-            with get_session() as session:
+            with get_db() as session:
                 report = get_quality_report(session)
             issues = 0
             details = {
@@ -185,7 +185,7 @@ class HealthChecker:
         """資格システムの健全性をチェックする"""
         try:
             from database.models import QualificationTag, CompanyProfile
-            with get_session() as session:
+            with get_db() as session:
                 tag_count = session.query(QualificationTag).count()
                 profile_count = session.query(CompanyProfile).count()
             details = {

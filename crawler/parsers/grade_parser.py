@@ -1,6 +1,6 @@
 """
 Grade Parser
-仕様書テキストから全省庁統一資格等级を抽出するパーサ。
+仕様書テキストから全省庁統一資格等級を抽出するパーサ。
 """
 import re
 from typing import Optional
@@ -9,7 +9,7 @@ from typing import Optional
 def extract_grade_from_text(text: str) -> Optional[str]:
     """
     テキストから全省庁統一資格等级を抽出する。
-    例: 「全省庁統一资格 A」→ "A"
+    例: 「全省庁統一資格 A」→ "A"
         「資格: B級」→ "B"
         「甲等級」→ "A" (甲=A, 乙=B, 丙=C, 丁=D)
     """
@@ -17,10 +17,10 @@ def extract_grade_from_text(text: str) -> Optional[str]:
         return None
 
     GRADE_MAP = {
-        "A": ["A", "a", "Ａ", "ａ"],
-        "B": ["B", "b", "Ｂ", "ｂ"],
-        "C": ["C", "c", "Ｃ", "ｃ"],
-        "D": ["D", "d", "Ｄ", "ｄ"],
+        "A": ["A", "ａ", "Ａ"],
+        "B": ["B", "ｂ", "Ｂ"],
+        "C": ["C", "ｃ", "Ｃ"],
+        "D": ["D", "ｄ", "Ｄ"],
     }
     KANJI_GRADE_MAP = {
         "甲": "A",
@@ -29,7 +29,7 @@ def extract_grade_from_text(text: str) -> Optional[str]:
         "丁": "D",
     }
 
-    # Check exact matches (case-sensitive for full-width)
+    text_lower = text.upper()
     for grade, variants in GRADE_MAP.items():
         for v in variants:
             if v in text:
@@ -58,16 +58,15 @@ def extract_unified_qualification_number(text: str) -> Optional[str]:
 
 def extract_all_grades(text: str) -> list[str]:
     """テキストから複数等级を一括抽出する。"""
-    grade = extract_grade_from_text(text)
-    if grade:
-        return [grade.upper()]
-    return []
+    grades = set()
+    for g in extract_grade_from_text(text):
+        if g:
+            grades.add(g.upper())
+    return list(grades)
 
 
 def normalize_grade_text(text: str) -> str:
     """等级表記正規化: 「甲」→「A」等に変換。"""
-    if not text:
-        return ""
     KANJI = {"甲": "A", "乙": "B", "丙": "C", "丁": "D", "1": "A", "2": "B", "3": "C", "4": "D"}
     result = text
     for kanji, latin in KANJI.items():

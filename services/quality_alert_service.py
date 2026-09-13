@@ -77,7 +77,7 @@ class QualityAlertService:
 
     def evaluate(self, metric_name: str, value: float) -> str:
         """しきい値を取得し、レベルを判定。存在しない場合は 'ok' を返す。"""
-        level, _ = self._evaluate_value(metric_name, value, self.yaml_thresholds)
+        level, _ = _evaluate_value(metric_name, value, self.yaml_thresholds)
         if level != "ok":
             return level
         return self._evaluate_db(metric_name, value)

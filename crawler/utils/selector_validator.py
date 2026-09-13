@@ -1,157 +1,114 @@
-"""
-Selector validation utility for GEPS selectors.
-"""
-from typing import List, Tuple, Dict, Any
+from __future__ import annotations
+
 from pathlib import Path
-from bs4 import BeautifulSoup
+from typing import Any, Iterable
+
 import yaml
+from bs4 import BeautifulSoup
 
 
 class SelectorValidator:
-    """セレクタ設定の妥当性を検証するクラス。"""
+    REQUIRED_PAGES = {"search_form", "search_results", "detail"}
+    REQUIRED_FIELDS = {
+        "search_form": {"query", "start_date", "end_date", "submit"},
+        "search_results": {"item", "title", "organization", "budget", "deadline"},
+        "detail": {"title", "organization", "budget", "deadline"},
+    }
 
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
+    def __init__(self, config: dict[str, Any] | None = None):
+        self.config = config or {}
 
     @classmethod
-    def from_file(cls, path: Path) -> "SelectorValidator":
-        """YAMLファイルからバリデータを作成する。"""
-        with path.open(encoding="utf-8") as fh:
-            config = yaml.safe_load(fh) or {}
-        return cls(config)
+    def from_file(cls, path: str | Path) -> "SelectorValidator":
+        with Path(path).open(encoding="utf-8") as config_file:
+            return cls(yaml.safe_load(config_file) or {})
 
-    def validate(self) -> Dict[str, Any]:
-        """全セレクタを検証する。"""
-        results = {
-            "valid": True,
-            "selector_count": 0,
-            "errors": [],
-            "warnings": [],
-        }
-        
-        pages = self.config.get("pages", {})
-        for page_type, fields in pages.items():
-            for field_name, selectors in fields.items():
-                candidates = self._flatten(selectors)
-                results["selector_count"] += len(candidates)
-                
-                for selector in candidates:
-                    # 基本的な構文チェック
-                    if not self._is_valid_selector_syntax(selector):
-                        results["valid"] = False
-                        results["errors"].append(f"Invalid selector syntax: {selector}")
-        
-        return results
-
-    def validate_against_html(self, html: str) -> Dict[str, Any]:
-        """実際のHTMLに対してセレクタを検証する。"""
-        results = {
-            "valid": True,
-            "matches": [],
-            "errors": [],
-        }
-        
-        pages = self.config.get("pages", {})
-        for page_type, fields in pages.items():
-            for field_name, selectors in fields.items():
-                candidates = self._flatten(selectors)
-                
-                for selector in candidates:
-                    is_valid, count = validate_selector(html, selector)
-                    results["matches"].append({
-                        "page_type": page_type,
-                        "field": field_name,
-                        "selector": selector,
-                        "is_valid": is_valid,
-                        "match_count": count,
-                    })
-                    if not is_valid:
-                        results["warnings"].append(
-                            f"Selector '{selector}' ({page_type}.{field_name}) matched 0 elements"
-                        )
-        
-        return results
-
-    def _flatten(self, value: Any) -> List[str]:
-        """セレクタ値を平坦化して候補リストを返す。"""
+    @staticmethod
+    def _candidates(value: Any) -> list[str]:
         if isinstance(value, str):
             return [value]
         if isinstance(value, list):
-            out: List[str] = []
+            result = []
             for item in value:
-                out.extend(self._flatten(item))
-            return out
+                result.extend(SelectorValidator._candidates(item))
+            return result
         return []
 
-    def _is_valid_selector_syntax(self, selector: str) -> bool:
-        """基本的なCSSセレクタ構文チェック。"""
-        try:
-            # 空文字列や明らかに無効なものを除外
-            if not selector or selector.strip() == "":
-                return False
-            # 簡易的な構文チェック: 開き括弧と閉じ括弧のバランス
-            if selector.count("[") != selector.count("]"):
-                return False
-            if selector.count("(") != selector.count(")"):
-                return False
-            # BeautifulSoupでパースしてみる
-            BeautifulSoup("", "html.parser").select(selector)
-            return True
-        except Exception:
-            return False
+    def validate(self) -> dict[str, Any]:
+        errors = []
+        version = self.config.get("selectors_version")
+        if not version:
+            errors.append("selectors_version is required")
+        pages = self.config.get("pages")
+        if not isinstance(pages, dict):
+            return {"valid": False, "errors": errors + ["pages must be a mapping"]}
+
+        selector_count = 0
+        for page_name in self.REQUIRED_PAGES:
+            page = pages.get(page_name)
+            if not isinstance(page, dict):
+                errors.append(f"missing page: {page_name}")
+                continue
+            required = self.REQUIRED_FIELDS.get(page_name, set())
+            for field in sorted(required):
+                candidates = self._candidates(page.get(field))
+                if not candidates:
+                    errors.append(f"missing selector: {page_name}.{field}")
+                    continue
+                selector_count += len(candidates)
+                for selector in candidates:
+                    try:
+                        BeautifulSoup("<root></root>", "html.parser").select_one(selector)
+                    except Exception as e:
+                        errors.append(f"invalid selector {page_name}.{field}: {selector}: {e}")
+
+        return {
+            "valid": not errors,
+            "selectors_version": version,
+            "selector_count": selector_count,
+            "errors": errors,
+        }
+
+    def validate_html(self, html: str, page_type: str | None = None) -> dict[str, Any]:
+        soup = BeautifulSoup(html, "html.parser")
+        pages = self.config.get("pages", {})
+        selected_pages = [page_type] if page_type else list(self.REQUIRED_PAGES)
+        results = {}
+        matched = 0
+        total = 0
+        for page_name in selected_pages:
+            page = pages.get(page_name, {})
+            page_result = {}
+            for field, selectors in page.items():
+                candidates = self._candidates(selectors)
+                field_matched = 0
+                for selector in candidates:
+                    total += 1
+                    try:
+                        count = len(soup.select(selector))
+                    except Exception:
+                        count = 0
+                    if count:
+                        field_matched += 1
+                        matched += 1
+                page_result[field] = {
+                    "matched": field_matched > 0,
+                    "matches": field_matched,
+                    "candidates": len(candidates),
+                }
+            results[page_name] = page_result
+        return {
+            "valid": matched > 0,
+            "match_rate": (matched / total * 100.0) if total else 0.0,
+            "matched": matched,
+            "total": total,
+            "pages": results,
+        }
 
 
-def validate_selector(html: str, selector: str) -> Tuple[bool, int]:
-    """
-    Validate a CSS selector against HTML.
-    
-    Args:
-        html: HTML string to validate against
-        selector: CSS selector string
-        
-    Returns:
-        Tuple of (is_valid, match_count) where is_valid is True if selector matches at least one element
-    """
-    try:
-        soup = BeautifulSoup(html, 'html.parser')
-        matches = soup.select(selector)
-        return len(matches) > 0, len(matches)
-    except Exception:
-        # If selector syntax is invalid, return False
-        return False, 0
+def validate_selector_config(config: dict[str, Any]) -> dict[str, Any]:
+    return SelectorValidator(config).validate()
 
 
-def validate_selectors(html: str, selectors: List[str]) -> List[Tuple[str, bool, int]]:
-    """
-    Validate a list of selectors against HTML.
-    
-    Args:
-        html: HTML string to validate against
-        selectors: List of CSS selector strings
-        
-    Returns:
-        List of tuples (selector, is_valid, match_count)
-    """
-    results = []
-    for selector in selectors:
-        is_valid, count = validate_selector(html, selector)
-        results.append((selector, is_valid, count))
-    return results
-
-
-def find_first_valid_selector(html: str, selectors: List[str]) -> Tuple[str, int]:
-    """
-    Find the first valid selector from a list (ordered by priority).
-    
-    Args:
-        html: HTML string to validate against
-        selectors: List of CSS selector strings in priority order
-        
-    Returns:
-        Tuple of (first_valid_selector, match_count) or ("", 0) if none valid
-    """
-    for selector in selectors:
-        is_valid, count = validate_selector(html, selector)
-        if is_valid:
-            return selector, count
-    return "", 0
+def validate_html_selectors(html: str, config: dict[str, Any], page_type: str | None = None) -> dict[str, Any]:
+    return SelectorValidator(config).validate_html(html, page_type=page_type)

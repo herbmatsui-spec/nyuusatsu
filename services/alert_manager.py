@@ -4,7 +4,6 @@ from database.session import get_session
 from database.models.crawl import SystemSetting
 from services.notification_service import NotificationService
 from services.crawl_service import CrawlService
-from typing import Optional
 
 logger = logging.getLogger("AlertManager")
 
@@ -60,9 +59,6 @@ class AlertManager:
         self.failure_threshold = failure_threshold
         self._consecutive_failures = {}
         # NotificationServiceの初期化にCrawlServiceが必要
-        from services.crawl_service import CrawlService
-        from services.notification_service import NotificationService
-        
         with get_session() as session:
             crawl_service = CrawlService(session)
             self.notifier = NotificationService(crawl_service)
@@ -125,7 +121,7 @@ class AlertManager:
 
     def _save_to_history(self, component: str, severity: str, message: str, is_recovery: bool):
         from database.models.alert_history import AlertHistory
-        with get_db() as session:
+        with get_session() as session:
             if is_recovery:
                 # 過去の未復旧アラートを探して solved_at を埋める
                 unresolved = session.query(AlertHistory).filter(

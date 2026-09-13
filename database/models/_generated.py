@@ -12,6 +12,7 @@ class Agency(Base):
     type = Column(String, )
     region = Column(String, )
     base_url = Column(String, )
+    bid_url_pattern = Column(String, )
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
     municipality_code = Column(String, )

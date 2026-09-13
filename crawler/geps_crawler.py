@@ -6,13 +6,12 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from urllib.parse import urljoin, urlparse
 
+import yaml
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 from bs4 import BeautifulSoup
-from crawler.async_base_crawler import BaseCrawler
+from crawler.base_crawler import BaseCrawler
 from crawler.utils.date_parser import parse_date_string
 from crawler.utils.date_filter import filter_by_date_range
-from crawler.utils.selector_loader import load_selectors as _load_selectors_config
-from crawler.utils.date_field_detector import detect_date_field
 
 logger = logging.getLogger(__name__)
 DEFAULT_SELECTOR_CONFIG = Path(__file__).parent / "config" / "geps_selectors.yaml"
@@ -32,18 +31,15 @@ class GEPSCrawler(BaseCrawler):
         selectors_path: Optional[Path | str] = None,
         selectors_version: Optional[str] = None,
     ):
-        # Convert Playwright timeout (ms) to aiohttp timeout (s)
-        aiohttp_timeout = timeout // 1000 if timeout > 1000 else timeout
         super().__init__(
             retry=3,
-            timeout=aiohttp_timeout,
+            timeout=timeout // 1000 if timeout > 1000 else timeout,
             backoff=0.5,
             start_date=start_date,
             end_date=end_date,
-            delay=delay,
-            rate_limit=2.0,
         )
-        self.playwright_timeout = timeout
+        self.delay = delay
+        self.timeout = timeout
         self.playwright = None
         self.browser = None
         self.context = None
@@ -52,8 +48,18 @@ class GEPSCrawler(BaseCrawler):
         self.selectors = self._load_selectors()
 
     def _load_selectors(self, page_type: Optional[str] = None) -> dict[str, Any]:
-        # Step 17: セレクタロードを crawler/utils/selector_loader.py へ集約
-        return _load_selectors_config(self.selectors_path, self.selectors_version, page_type)
+        with self.selectors_path.open(encoding="utf-8") as selector_file:
+            config = yaml.safe_load(selector_file) or {}
+        version = config.get("selectors_version")
+        if not version:
+            raise ValueError(f"Selector version is missing: {self.selectors_path}")
+        if self.selectors_version and str(version) != str(self.selectors_version):
+            raise ValueError(
+                f"Selector version mismatch: expected {self.selectors_version}, got {version}"
+            )
+        if page_type:
+            return config.get("pages", {}).get(page_type, {})
+        return config
 
     @staticmethod
     def _selector_candidates(value: Any) -> list[str]:
@@ -106,9 +112,29 @@ class GEPSCrawler(BaseCrawler):
         return None
 
     async def _find_date_field(self, page: Page, purpose: str):
-        # Step 22: 検出ロジックを crawler/utils/date_field_detector.py へ抽出
         configured = self.selectors.get("pages", {}).get("search_form", {}).get(purpose, [])
-        return await detect_date_field(page, configured, purpose)
+        element = await self._query_selector(page, configured)
+        if element:
+            return element
+        heuristic = [
+            'input.datepicker',
+            'input[class*="datepicker"]',
+            'input[id*="date" i]',
+            'input[name*="date" i]',
+            'input[placeholder*="日付" i]',
+            'input[type="date"]',
+        ]
+        elements = []
+        for selector in heuristic:
+            try:
+                elements = await page.query_selector_all(selector)
+            except Exception:
+                continue
+            if elements:
+                break
+        if not elements:
+            return None
+        return elements[-1] if purpose == "end_date" else elements[0]
 
     async def _wait_for_results(self, page: Page):
         selectors = self.selectors.get("pages", {}).get("search_results", {}).get("item", [])

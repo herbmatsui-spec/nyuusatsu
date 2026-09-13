@@ -18,7 +18,6 @@ import requests
 import random
 from sqlalchemy.orm import Session
 from bs4 import BeautifulSoup
-from crawler.exceptions import CrawlError, ParseError, RateLimitError
 
 # Automatic selector detection imports
 from crawler.parsers.structure_detector import StructureDetector
@@ -159,7 +158,7 @@ class BaseCrawler(ABC):
 
         return agencies
 
-# 将来的に非同期版も追加予定: async def async_fetch(self, url: str) -> str:
+    # 将来的に非同期版も追加予定: async def async_fetch(self, url: str) -> str:
     def fetch(self, url: str) -> str:
         """HTTP GET with exponential backoff retry, rate limiting, and proxy support."""
         import random
@@ -172,47 +171,16 @@ class BaseCrawler(ABC):
                 proxy = self._proxy_manager.get_next_proxy()
                 proxies = {"http": proxy, "https": proxy} if proxy else None
                 resp = requests.get(url, timeout=self.timeout, proxies=proxies)
-                # Detect rate limit status code 429
-                if resp.status_code == 429:
-                    raise RateLimitError(f"Rate limit exceeded for {url}")
                 resp.raise_for_status()
                 return resp.text
-            except RateLimitError as e:
-                logger.warning(f"Rate limit error for {url}, attempt {attempt + 1}/{self.retry}")
-                attempt += 1
-                if attempt < self.retry:
-                    jitter = random.uniform(0, self.backoff * attempt)
-                    wait_time = self.backoff * (2 ** attempt) + jitter
-                    time.sleep(wait_time)
-                else:
-                    raise
-            except requests.exceptions.HTTPError as e:
-                logger.warning(f"HTTP error {e} for {url}, attempt {attempt + 1}/{self.retry}")
-                attempt += 1
-                if attempt < self.retry:
-                    jitter = random.uniform(0, self.backoff * attempt)
-                    wait_time = self.backoff * (2 ** attempt) + jitter
-                    time.sleep(wait_time)
-                else:
-                    raise CrawlError(f"HTTP error {e}") from e
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-                logger.warning(f"Connection error {e} for {url}, attempt {attempt + 1}/{self.retry}")
-                attempt += 1
-                if attempt < self.retry:
-                    jitter = random.uniform(0, self.backoff * attempt)
-                    wait_time = self.backoff * (2 ** attempt) + jitter
-                    time.sleep(wait_time)
-                else:
-                    raise CrawlError(f"Connection error {e}") from e
             except Exception as e:
                 logger.warning(f"Fetch error {e} for {url}, attempt {attempt + 1}/{self.retry}")
                 attempt += 1
                 if attempt < self.retry:
+                    # Exponential backoff with jitter
                     jitter = random.uniform(0, self.backoff * attempt)
                     wait_time = self.backoff * (2 ** attempt) + jitter
                     time.sleep(wait_time)
-                else:
-                    raise CrawlError(f"Unexpected error {e}") from e
         raise RuntimeError(f"Failed to fetch {url} after {self.retry} attempts")
 
     def _auto_select_elements(self, html: str, fallback_selectors: Optional[List[str]] = None) -> List:

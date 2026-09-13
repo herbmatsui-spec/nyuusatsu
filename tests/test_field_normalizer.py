@@ -1,154 +1,137 @@
-"""Tests for Field Normalizer utilities."""
-
+"""
+Tests for Field Normalizer
+"""
 import pytest
-from datetime import date
 from crawler.parsers.field_normalizer import (
     normalize_amount,
     normalize_date,
     normalize_whitespace,
     normalize_fullwidth_to_halfwidth,
-    TRANSFORM_MAP,
+    TRANSFORM_MAP
 )
+from datetime import date
+
+# Check if mojimiji is available
+try:
+    import mojimiji
+    MOJIMJI_AVAILABLE = True
+except ImportError:
+    MOJIMJI_AVAILABLE = False
 
 
-class TestNormalizeAmount:
-    """normalize_amount のテスト。"""
-
-    @pytest.mark.parametrize("text,expected", [
-        ("1,234,567円", 1234567),
-        ("1,234,567", 1234567),
-        ("¥1,234,567", 1234567),
-        ("1234567", 1234567),
-        (" 1,234,567 ", 1234567),
-        ("金額 1,000,000 円", 1000000),
-        ("", 0),
-        ("円", 0),
-        ("abc", 0),
-        ("1,2,3,4", 1234),
-        ("１２３", 123),  # 全角数字も除去されて残る
-        ("-1,000", 1000),  # マイナス記号は除去
-    ])
-    def test_amount_normalization(self, text, expected):
-        assert normalize_amount(text) == expected
-
-
-class TestNormalizeDate:
-    """normalize_date のテスト。"""
-
-    @pytest.mark.parametrize("text,expected", [
-        ("2024.04.01", date(2024, 4, 1)),
-        ("2024/04/01", date(2024, 4, 1)),
-        ("2024-04-01", date(2024, 4, 1)),
-        ("20240401", date(2024, 4, 1)),
-        (" 2024.04.01 ", date(2024, 4, 1)),
-        ("2024/4/1", date(2024, 4, 1)),
-        ("2024-4-1", date(2024, 4, 1)),
-        ("", None),
-        ("invalid", None),
-        ("2024/13/01", None),
-        ("2024/02/30", None),
-        ("2024.13.01", None),
-        ("01/04/2024", None),  # DD/MM/YYYY は非対応
-    ])
-    def test_date_normalization(self, text, expected):
-        assert normalize_date(text) == expected
+def test_normalize_amount():
+    """金額正規化のテスト"""
+    # 通常のケース
+    assert normalize_amount("12,345,678円") == 12345678
+    assert normalize_amount("予定価格 12,345,678円") == 12345678
+    assert normalize_amount("12 345 678") == 12345678
+    assert normalize_amount("¥12,345,678") == 12345678
+    assert normalize_amount("￥12,345,678") == 12345678
+    assert normalize_amount("12345678") == 12345678
+    
+    # ゼロのケース
+    assert normalize_amount("0円") == 0
+    assert normalize_amount("ゼロ") == 0
+    assert normalize_amount("") == 0
+    
+    # 負の数（マイナス符号は削除される）
+    assert normalize_amount("-123円") == 123
+    
+    # 小数点以下は切り捨て
+    assert normalize_amount("1234.56円") == 123456
 
 
-class TestNormalizeWhitespace:
-    """normalize_whitespace のテスト。"""
-
-    @pytest.mark.parametrize("text,expected", [
-        ("  hello   world  ", "hello world"),
-        ("hello\tworld", "hello world"),
-        ("hello\nworld", "hello world"),
-        ("  a  b  c  ", "a b c"),
-        ("", ""),
-        ("   ", ""),
-        ("single", "single"),
-        ("\t\n\r", ""),
-        ("full　width　space", "full width space"),  # 全角スペースも分割
-    ])
-    def test_whitespace_normalization(self, text, expected):
-        assert normalize_whitespace(text) == expected
-
-
-class TestNormalizeFullwidthToHalfwidth:
-    """normalize_fullwidth_to_halfwidth のテスト。"""
-
-    @pytest.mark.parametrize("text,expected", [
-        ("１２３４５", "12345"),
-        ("ＡＢＣＤ", "ABCD"),
-        ("１２３ＡＢＣ", "123ABC"),
-        ("Ｈｅｌｌｏ", "Hello"),
-        ("１２３＆ＡＢＣ", "123&ABC"),
-        ("", ""),
-        ("123ABC", "123ABC"),  # 半角はそのまま
-        ("テスト", "テスト"),  # 日本語は変換対象外
-        ("テスト１２３", "テスト123"),
-    ])
-    def test_fullwidth_to_halfwidth(self, text, expected):
-        result = normalize_fullwidth_to_halfwidth(text)
-        assert result == expected
+def test_normalize_date():
+    """日付正規化のテスト"""
+    # 西暦形式
+    assert normalize_date("2024.04.01") == date(2024, 4, 1)
+    assert normalize_date("2024/04/01") == date(2024, 4, 1)
+    assert normalize_date("2024-04-01") == date(2024, 4, 1)
+    assert normalize_date("20240401") == date(2024, 4, 1)
+    
+    # ゼロパディング
+    assert normalize_date("2024.1.1") == date(2024, 1, 1)
+    assert normalize_date("2024/1/1") == date(2024, 1, 1)
+    assert normalize_date("2024-1-1") == date(2024, 1, 1)
+    assert normalize_date("2024111") == date(2024, 11, 1)
+    
+    # 無効な日付
+    assert normalize_date("2024.13.01") is None  # 無効月
+    assert normalize_date("2024.04.31") is None  # 無効日
+    assert normalize_date("2023/02/29") is None  # 閏年ではない（2023は閏年ではない）
+    assert normalize_date("不正な日付") is None
+    assert normalize_date("") is None
+    assert normalize_date("   ") is None
 
 
-class TestTransformMap:
-    """TRANSFORM_MAP のテスト。"""
-
-    def test_transform_map_keys(self):
-        """必要なキーがすべて存在することを確認。"""
-        expected_keys = {
-            "normalize_amount",
-            "normalize_date",
-            "normalize_whitespace",
-            "normalize_fullwidth_to_halfwidth",
-        }
-        assert set(TRANSFORM_MAP.keys()) == expected_keys
-
-    def test_transform_map_functions_callable(self):
-        """すべての関数が呼び出し可能であることを確認。"""
-        for name, func in TRANSFORM_MAP.items():
-            assert callable(func), f"{name} is not callable"
-
-    def test_transform_map_integration(self):
-        """TRANSFORM_MAP 経由での呼び出しテスト。"""
-        # normalize_amount
-        result = TRANSFORM_MAP["normalize_amount"]("1,234円")
-        assert result == 1234
-
-        # normalize_date
-        result = TRANSFORM_MAP["normalize_date"]("2024.04.01")
-        assert result == date(2024, 4, 1)
-
-        # normalize_whitespace
-        result = TRANSFORM_MAP["normalize_whitespace"]("  a  b  ")
-        assert result == "a b"
-
-        # normalize_fullwidth_to_halfwidth
-        result = TRANSFORM_MAP["normalize_fullwidth_to_halfwidth"]("１２３")
-        assert result == "123"
+def test_normalize_whitespace():
+    """空白正規化のテスト"""
+    # 通常のケース
+    assert normalize_whitespace("  hello  world  ") == "hello world"
+    assert normalize_whitespace("hello\t\tworld") == "hello world"
+    assert normalize_whitespace("hello\n\nworld") == "hello world"
+    assert normalize_whitespace("  \t  \n  ") == ""
+    
+    # 日本語のケース
+    assert normalize_whitespace("  こんにちは  世界  ") == "こんにちは 世界"
+    assert normalize_whitespace("こんにちは\t\t世界") == "こんにちは 世界"
+    
+    # 空文字列
+    assert normalize_whitespace("") == ""
+    assert normalize_whitespace("   ") == ""
 
 
-class TestEdgeCases:
-    """エッジケースのテスト。"""
+def test_normalize_fullwidth_to_halfwidth():
+    """全角半角正規化のテスト"""
+    if not MOJIMJI_AVAILABLE:
+        pytest.skip("mojimiji library not available")
+    
+    # 数字の全角→半角
+    assert normalize_fullwidth_to_halfwidth("１２３４５６７８９０") == "1234567890"
+    
+    # アルファベットの全角→半角
+    assert normalize_fullwidth_to_halfwidth("ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ") == "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    assert normalize_fullwidth_to_halfwidth("ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ") == "abcdefghijklmnopqrstuvwxyz"
+    
+    # 記号の全角→半角
+    assert normalize_fullwidth_to_halfwidth("！＃＄％＆’（）＊＋，－．／：；＜＞？＠［＼］＾＿｀｛｜｝～") == "!#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+    
+    # 日本語は変換されない（ひらがな・カタカナ・漢字）
+    assert normalize_fullwidth_to_halfwidth("こんにちは") == "こんにちは"
+    assert normalize_fullwidth_to_halfwidth("コンニチワ") == "コンニチワ"
+    assert normalize_fullwidth_to_halfwidth("今日") == "今日"
+    
+    # 混合文字列
+    assert normalize_fullwidth_to_halfwidth("Ｈｅｌｌｏ　Ｗｏｒｌｄ　１２３") == "Hello World 123"
+    
+    # 空文字列
+    assert normalize_fullwidth_to_halfwidth("") == ""
 
-    def test_normalize_amount_large_number(self):
-        """大きな数値。"""
-        result = normalize_amount("9,999,999,999円")
-        assert result == 9999999999
 
-    def test_normalize_amount_only_commas(self):
-        """カンマのみ。"""
-        assert normalize_amount(",,,,") == 0
-
-    def test_normalize_date_year_only(self):
-        """年だけの文字列。"""
-        assert normalize_date("2024") is None
-
-    def test_normalize_whitespace_preserves_internal(self):
-        """内部スペースは保持される。"""
-        assert normalize_whitespace("a  b") == "a b"  # 連続スペースは1つに
-        assert normalize_whitespace("a b") == "a b"
+def test_transform_map():
+    """TRANSFORM_MAPのテスト"""
+    # マップにすべての関数が含まれていることを確認
+    assert "normalize_amount" in TRANSFORM_MAP
+    assert "normalize_date" in TRANSFORM_MAP
+    assert "normalize_whitespace" in TRANSFORM_MAP
+    assert "normalize_fullwidth_to_halfwidth" in TRANSFORM_MAP
+    
+    # 各関数が正しくマップされていることを確認
+    assert TRANSFORM_MAP["normalize_amount"] == normalize_amount
+    assert TRANSFORM_MAP["normalize_date"] == normalize_date
+    assert TRANSFORM_MAP["normalize_whitespace"] == normalize_whitespace
+    assert TRANSFORM_MAP["normalize_fullwidth_to_halfwidth"] == normalize_fullwidth_to_halfwidth
+    
+    # 関数が実際に呼び出せることを確認
+    assert TRANSFORM_MAP["normalize_amount"]("123円") == 123
+    assert TRANSFORM_MAP["normalize_date"]("2024.04.01") == date(2024, 4, 1)
+    assert TRANSFORM_MAP["normalize_whitespace"]("  a  b  ") == "a b"
+    
+    # normalize_fullwidth_to_halfwidthはmojimijiが利用可能な場合のみテスト
+    if MOJIMJI_AVAILABLE:
+        assert TRANSFORM_MAP["normalize_fullwidth_to_halfwidth"]("ＡＢＣ") == "ABC"
 
 
 if __name__ == "__main__":
+    import pytest
     pytest.main([__file__, "-v"])

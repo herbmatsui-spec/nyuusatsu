@@ -11,17 +11,24 @@ def mock_session():
 
 
 def make_query_chain(mock_session, total_count, filter_counts):
-    """session.query(Bid) の呼び出しごとに異なるモックを返すヘルパー
-
-    SQL CASE最適化版: with_entities(sum(case(...))).one() がタプルを返す。
-    filter_counts は各フィールドの欠損件数を表す。
-    """
+    """session.query(Bid) の呼び出しごとに異なるモックを返すヘルパー"""
+    filter_call_count = [0]
     base_query = MagicMock()
     base_query.count.return_value = total_count
-
-    # SQL CASE最適化: with_entities(...).one() がタプル（各フィールドの欠損数）を返す
-    base_query.with_entities.return_value.one.return_value = tuple(filter_counts)
-
+    
+    def filter_side_effect(*args, **kwargs):
+        idx = filter_call_count[0]
+        filter_call_count[0] += 1
+        filtered_mock = MagicMock()
+        if idx < len(filter_counts):
+            filtered_mock.count.return_value = filter_counts[idx]
+        else:
+            filtered_mock.count.return_value = 0
+        return filtered_mock
+    
+    base_query.filter.side_effect = filter_side_effect
+    
+    # Mock _bid_query to return base_query
     mock_session.query.return_value = base_query
 
 
@@ -171,22 +178,15 @@ def test_acquisition_delay_median_even_count(mock_session):
     service = QualityMetricsService(mock_session)
 
     mock_query = MagicMock()
-    mock_filtered = MagicMock()
-    
+    service._bid_query = MagicMock(return_value=mock_query)
+    mock_query.filter.return_value = mock_query
     # total = 2 (even), mid = 1, offset = 0
-    mock_filtered.count.return_value = 2
-    mock_filtered.filter.return_value = mock_filtered
-    mock_filtered.order_by.return_value = mock_filtered
-    mock_filtered.limit.return_value = mock_filtered
-    mock_filtered.offset.return_value = mock_filtered
-    mock_filtered.with_entities.return_value = mock_filtered
-    mock_filtered.all.return_value = [10.0, 20.0]
-    mock_filtered.scalar.return_value = None
-    
-    # Mock the chain: session.query -> _bid_query -> _filtered_bid_query
-    mock_query.filter.return_value = mock_filtered
-    mock_session.query.return_value = mock_query
-    service._bid_query = MagicMock(return_value=mock_filtered)
+    mock_query.count.return_value = 2
+    mock_query.order_by.return_value = mock_query
+    mock_query.limit.return_value = mock_query
+    mock_query.offset.return_value = mock_query
+    mock_query.with_entities.return_value = mock_query
+    mock_query.all.return_value = [10.0, 20.0]
 
     result = service.acquisition_delay_median()
 

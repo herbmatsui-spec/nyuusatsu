@@ -82,7 +82,7 @@ class TestHealthChecker:
         assert result.status == HealthStatus.UNHEALTHY
 
     # キュー深度チェック
-    @patch("rq.Queue")
+    @patch("services.health_checker.Queue")
     @patch("database.redis_conn.redis_conn")
     def test_check_queue_depth_healthy(self, mock_redis_conn, mock_queue_class):
         mock_queue = MagicMock()
@@ -98,7 +98,7 @@ class TestHealthChecker:
         assert result.status == HealthStatus.HEALTHY
         assert "crawl_tasks" in result.details
 
-    @patch("rq.Queue")
+    @patch("services.health_checker.Queue")
     @patch("database.redis_conn.redis_conn")
     def test_check_queue_depth_degraded(self, mock_redis_conn, mock_queue_class):
         mock_queue = MagicMock()
@@ -114,7 +114,7 @@ class TestHealthChecker:
         assert result.status == HealthStatus.DEGRADED
         assert "exceeded threshold" in result.message
 
-    @patch("rq.Queue")
+    @patch("services.health_checker.Queue")
     @patch("database.redis_conn.redis_conn")
     def test_check_queue_depth_failure(self, mock_redis_conn, mock_queue_class):
         mock_queue_class.side_effect = Exception("Redis error")
@@ -224,7 +224,7 @@ class TestHealthChecker:
         assert result.status == HealthStatus.DEGRADED
 
     # 落札データ品質チェック
-    @patch("services.award_quality_checker.get_quality_report")
+    @patch("services.health_checker.get_quality_report")
     @patch("services.health_checker.get_session")
     def test_check_award_data_quality_healthy(self, mock_get_session, mock_get_quality_report):
         mock_get_quality_report.return_value = {
@@ -241,7 +241,7 @@ class TestHealthChecker:
         assert result.name == "AwardDataQuality"
         assert result.status == HealthStatus.HEALTHY
 
-    @patch("services.award_quality_checker.get_quality_report")
+    @patch("services.health_checker.get_quality_report")
     @patch("services.health_checker.get_session")
     def test_check_award_data_quality_degraded(self, mock_get_session, mock_get_quality_report):
         mock_get_quality_report.return_value = {
@@ -259,7 +259,7 @@ class TestHealthChecker:
         assert result.status == HealthStatus.DEGRADED
         assert "issues found" in result.message
 
-    @patch("services.award_quality_checker.get_quality_report")
+    @patch("services.health_checker.get_quality_report")
     @patch("services.health_checker.get_session")
     def test_check_award_data_quality_error(self, mock_get_session, mock_get_quality_report):
         mock_get_quality_report.side_effect = Exception("Quality check error")
@@ -331,14 +331,9 @@ class TestHealthChecker:
     @patch.object(HealthChecker, "check_qualification_system")
     def test_check_all_healthy(self, mock_qual, mock_award, mock_pipeline, 
                                 mock_sched, mock_db, mock_queue, mock_redis):
-        # すべて HEALTHY - 各コンポーネントにユニークな名前を設定
-        mock_redis.return_value = ComponentHealth("Redis", HealthStatus.HEALTHY)
-        mock_queue.return_value = ComponentHealth("QueueDepth", HealthStatus.HEALTHY)
-        mock_db.return_value = ComponentHealth("Database", HealthStatus.HEALTHY)
-        mock_sched.return_value = ComponentHealth("Scheduler", HealthStatus.HEALTHY)
-        mock_pipeline.return_value = ComponentHealth("PipelineRecency", HealthStatus.HEALTHY)
-        mock_award.return_value = ComponentHealth("AwardDataQuality", HealthStatus.HEALTHY)
-        mock_qual.return_value = ComponentHealth("QualificationSystem", HealthStatus.HEALTHY)
+        # すべて HEALTHY
+        for mock in [mock_redis, mock_queue, mock_db, mock_sched, mock_pipeline, mock_award, mock_qual]:
+            mock.return_value = ComponentHealth("Test", HealthStatus.HEALTHY)
         
         hc = HealthChecker()
         result = hc.check_all()
@@ -357,17 +352,11 @@ class TestHealthChecker:
                                   mock_sched, mock_db, mock_queue, mock_redis):
         # 1つ UNHEALTHY
         mock_redis.return_value = ComponentHealth("Redis", HealthStatus.UNHEALTHY)
-        mock_queue.return_value = ComponentHealth("QueueDepth", HealthStatus.HEALTHY)
-        mock_db.return_value = ComponentHealth("Database", HealthStatus.HEALTHY)
-        mock_sched.return_value = ComponentHealth("Scheduler", HealthStatus.HEALTHY)
-        mock_pipeline.return_value = ComponentHealth("PipelineRecency", HealthStatus.HEALTHY)
-        mock_award.return_value = ComponentHealth("AwardDataQuality", HealthStatus.HEALTHY)
-        mock_qual.return_value = ComponentHealth("QualificationSystem", HealthStatus.HEALTHY)
+        for mock in [mock_queue, mock_db, mock_sched, mock_pipeline, mock_award, mock_qual]:
+            mock.return_value = ComponentHealth("Test", HealthStatus.HEALTHY)
         
         hc = HealthChecker()
         result = hc.check_all()
-        
-        assert result["overall_status"] == "unhealthy"
         
         assert result["overall_status"] == "unhealthy"
 
@@ -382,12 +371,8 @@ class TestHealthChecker:
                                  mock_sched, mock_db, mock_queue, mock_redis):
         # 1つ DEGRADED、UNHEALTHY なし
         mock_redis.return_value = ComponentHealth("Redis", HealthStatus.DEGRADED)
-        mock_queue.return_value = ComponentHealth("QueueDepth", HealthStatus.HEALTHY)
-        mock_db.return_value = ComponentHealth("Database", HealthStatus.HEALTHY)
-        mock_sched.return_value = ComponentHealth("Scheduler", HealthStatus.HEALTHY)
-        mock_pipeline.return_value = ComponentHealth("PipelineRecency", HealthStatus.HEALTHY)
-        mock_award.return_value = ComponentHealth("AwardDataQuality", HealthStatus.HEALTHY)
-        mock_qual.return_value = ComponentHealth("QualificationSystem", HealthStatus.HEALTHY)
+        for mock in [mock_queue, mock_db, mock_sched, mock_pipeline, mock_award, mock_qual]:
+            mock.return_value = ComponentHealth("Test", HealthStatus.HEALTHY)
         
         hc = HealthChecker()
         result = hc.check_all()
@@ -402,20 +387,15 @@ class TestHealthChecker:
     @patch.object(HealthChecker, "check_award_data_quality")
     @patch.object(HealthChecker, "check_qualification_system")
     def test_check_all_unhealthy_overrides_degraded(self, mock_qual, mock_award, mock_pipeline,
-                                                      mock_sched, mock_db, mock_queue, mock_redis):
+                                                     mock_sched, mock_db, mock_queue, mock_redis):
         # UNHEALTHY と DEGRADED が混在 -> UNHEALTHY 優先
         mock_redis.return_value = ComponentHealth("Redis", HealthStatus.UNHEALTHY)
         mock_queue.return_value = ComponentHealth("QueueDepth", HealthStatus.DEGRADED)
-        mock_db.return_value = ComponentHealth("Database", HealthStatus.HEALTHY)
-        mock_sched.return_value = ComponentHealth("Scheduler", HealthStatus.HEALTHY)
-        mock_pipeline.return_value = ComponentHealth("PipelineRecency", HealthStatus.HEALTHY)
-        mock_award.return_value = ComponentHealth("AwardDataQuality", HealthStatus.HEALTHY)
-        mock_qual.return_value = ComponentHealth("QualificationSystem", HealthStatus.HEALTHY)
+        for mock in [mock_db, mock_sched, mock_pipeline, mock_award, mock_qual]:
+            mock.return_value = ComponentHealth("Test", HealthStatus.HEALTHY)
         
         hc = HealthChecker()
         result = hc.check_all()
-        
-        assert result["overall_status"] == "unhealthy"
         
         assert result["overall_status"] == "unhealthy"
 

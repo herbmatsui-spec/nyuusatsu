@@ -1,117 +1,94 @@
-"""URL Change Detector - compares current URLs with stored ones to detect changes."""
+"""URL変更検知機能。
 
-import json
-import os
+過去のレスポンス（ステータスコード / コンテンツのハッシュ）と比較し、
+URLが変更・メンテナンス中・削除された場合にフラグを立てる。
+スナップショットは ``data/url_snapshots.json`` に保持する。
+"""
+from __future__ import annotations
+
 import hashlib
+import json
+import logging
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass, asdict
-from crawler.registry import RegistryEntry
+
+from crawler.registry import PROJECT_ROOT
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_SNAPSHOT_PATH = str(PROJECT_ROOT / "data" / "url_snapshots.json")
 
 
 @dataclass
-class StoredURLState:
-    """Stored state of a URL for change detection."""
-    municipality_code: str
-    base_url: str
-    bid_url_pattern: str
-    base_url_hash: str
-    bid_url_hash: str
-    last_checked: str
-    change_detected: bool = False
+class ChangeDetection:
+    url: str
+    changed: bool
+    previous_status: Optional[int]
+    current_status: Optional[int]
+    previous_hash: Optional[str]
+    current_hash: str
+    reason: str = ""
 
 
-class URLChangeDetector:
-    """Detects changes in URLs by comparing with stored states."""
-    
-    def __init__(self, state_file: str = "data/url_registry_state.json"):
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.state_file = os.path.join(base_dir, state_file)
-        self._states: dict[str, StoredURLState] = {}
-        self._load_state()
+class UrlChangeDetector:
+    """レスポンスのステータスコードとヘッダ/テキストハッシュで変化を検知。"""
 
-    def _load_state(self) -> None:
-        """Load stored URL states from file."""
-        if os.path.exists(self.state_file):
-            with open(self.state_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                for code, state in data.items():
-                    self._states[code] = StoredURLState(**state)
+    def __init__(self, snapshot_path: str = DEFAULT_SNAPSHOT_PATH) -> None:
+        self.snapshot_path = snapshot_path
+        self._snapshots: dict = self._load_snapshots()
 
-    def _save_state(self) -> None:
-        """Save URL states to file."""
-        data = {code: asdict(state) for code, state in self._states.items()}
-        os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
-        with open(self.state_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+    def _load_snapshots(self) -> dict:
+        if os.path.exists(self.snapshot_path):
+            try:
+                with open(self.snapshot_path, "r", encoding="utf-8") as fh:
+                    return json.load(fh)
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Failed to load snapshots: %s", e)
+        return {}
 
-    def _compute_hash(self, url: str) -> str:
-        """Compute SHA256 hash of a URL."""
-        return hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]
+    def save_snapshots(self) -> None:
+        Path(os.path.dirname(self.snapshot_path) or ".").mkdir(parents=True, exist_ok=True)
+        with open(self.snapshot_path, "w", encoding="utf-8") as fh:
+            json.dump(self._snapshots, fh, indent=2, ensure_ascii=False)
+        logger.info("Saved %d URL snapshots to %s", len(self._snapshots), self.snapshot_path)
 
-    def check_changes(self, entry: RegistryEntry) -> dict:
-        """Check if URLs have changed for a registry entry.
-        
-        Returns:
-            Dict with change detection results
-        """
-        from datetime import datetime
-        
-        current_base_hash = self._compute_hash(entry.base_url)
-        current_bid_hash = self._compute_hash(entry.bid_url_pattern)
-        
-        stored = self._states.get(entry.municipality_code)
-        
-        if stored is None:
-            # First time seeing this entry
-            result = {
-                "municipality_code": entry.municipality_code,
-                "name": entry.name,
-                "base_url_changed": False,
-                "bid_url_changed": False,
-                "is_new": True,
-                "stored_base_url": None,
-                "stored_bid_url": None,
-                "current_base_url": entry.base_url,
-                "current_bid_url": entry.bid_url_pattern,
-            }
-        else:
-            base_changed = stored.base_url_hash != current_base_hash
-            bid_changed = stored.bid_url_hash != current_bid_hash
-            
-            result = {
-                "municipality_code": entry.municipality_code,
-                "name": entry.name,
-                "base_url_changed": base_changed,
-                "bid_url_changed": bid_changed,
-                "is_new": False,
-                "stored_base_url": stored.base_url,
-                "stored_bid_url": stored.bid_url_pattern,
-                "current_base_url": entry.base_url,
-                "current_bid_url": entry.bid_url_pattern,
-            }
-        
-        return result
+    @staticmethod
+    def _hash_payload(content: str, status_code: Optional[int]) -> str:
+        payload = f"{status_code}|{content or ''}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    def update_state(self, entry: RegistryEntry) -> None:
-        """Update stored state for an entry after successful sync."""
-        from datetime import datetime
-        
-        self._states[entry.municipality_code] = StoredURLState(
-            municipality_code=entry.municipality_code,
-            base_url=entry.base_url,
-            bid_url_pattern=entry.bid_url_pattern,
-            base_url_hash=self._compute_hash(entry.base_url),
-            bid_url_hash=self._compute_hash(entry.bid_url_pattern),
-            last_checked=datetime.now().isoformat(),
-            change_detected=False,
+    def detect(
+        self,
+        url: str,
+        current_content: str,
+        current_status: Optional[int],
+    ) -> ChangeDetection:
+        current_hash = self._hash_payload(current_content, current_status)
+        prev = self._snapshots.get(url)
+
+        changed = False
+        reason = ""
+        if prev is None:
+            reason = "first_seen"
+        elif prev.get("status") != current_status:
+            changed = True
+            reason = f"status_change:{prev.get('status')}->{current_status}"
+        elif prev.get("hash") != current_hash:
+            changed = True
+            reason = "content_changed"
+
+        self._snapshots[url] = {
+            "status": current_status,
+            "hash": current_hash,
+        }
+        return ChangeDetection(
+            url=url,
+            changed=changed,
+            previous_status=prev.get("status") if prev else None,
+            current_status=current_status,
+            previous_hash=prev.get("hash") if prev else None,
+            current_hash=current_hash,
+            reason=reason,
         )
-        self._save_state()
-
-    def get_all_changes(self, entries: list[RegistryEntry]) -> list[dict]:
-        """Check changes for all entries."""
-        return [self.check_changes(entry) for entry in entries]
-
-    def get_changed_entries(self, entries: list[RegistryEntry]) -> list[dict]:
-        """Get only entries with detected changes."""
-        all_changes = self.get_all_changes(entries)
-        return [c for c in all_changes if c["base_url_changed"] or c["bid_url_changed"] or c["is_new"]]

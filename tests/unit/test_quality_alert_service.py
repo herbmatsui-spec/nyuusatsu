@@ -8,10 +8,10 @@ from services.quality_alert_service import (
     _load_yaml_thresholds,
     _evaluate_value,
 )
-from services.alert_manager import (
-    send_slack_alert,
-    send_line_alert,
-    send_live_test_report,
+from notifier import (
+    SlackNotificationService,
+    LineNotificationService,
+    create_notification_service,
 )
 
 
@@ -151,19 +151,34 @@ class TestQualityAlertService:
 
     @pytest.fixture
     def service(self, mock_session):
-        with patch("services.quality_alert_service._load_yaml_thresholds", return_value={
-            "missing_field_rate": {
-                "warning": 10.0,
-                "critical": 20.0,
-                "lower_is_worse": True
-            },
-            "duplicate_rate": {
-                "warning": 5.0,
-                "critical": 10.0,
-                "lower_is_worse": False
-            },
-        }):
+        """Test service with mocked YAML thresholds"""
+        with patch("services.quality_alert_service._load_yaml_thresholds") as mock_load:
+            mock_load.return_value = {
+                "missing_field_rate": {
+                    "warning": 10.0,
+                    "critical": 20.0,
+                    "lower_is_worse": False
+                },
+                "duplicate_rate": {
+                    "warning": 5.0,
+                    "critical": 10.0,
+                    "lower_is_worse": False
+                },
+            }
             svc = QualityAlertService(mock_session)
+            # Force the cached property to use our mock data
+            svc._yaml_thresholds = {
+                "missing_field_rate": {
+                    "warning": 10.0,
+                    "critical": 20.0,
+                    "lower_is_worse": False
+                },
+                "duplicate_rate": {
+                    "warning": 5.0,
+                    "critical": 10.0,
+                    "lower_is_worse": False
+                },
+            }
             return svc
 
     def test_init(self, service):
@@ -182,12 +197,13 @@ class TestQualityAlertService:
 
     def test_evaluate_yaml_ok(self, service):
         """YAMLしきい値で正常"""
+        # DB fallback should return None so overall result is "ok"
+        service.session.query.return_value.filter_by.return_value.first.return_value = None
         result = service.evaluate("missing_field_rate", 5.0)
         assert result == "ok"
 
     def test_evaluate_db_fallback(self, service):
         """DBフォールバック評価"""
-        # YAMLにないメトリクス
         mock_threshold = MagicMock()
         mock_threshold.alert_at = 50.0
         mock_threshold.warn_at = 30.0
@@ -230,7 +246,7 @@ class TestQualityAlertService:
         assert result == "ok"
 
     def test_get_threshold_value_yaml(self, service):
-        """YAMLから閾値取得"""
+        """YAMLから閾値取得 - missing_field_rate has warning=10.0, critical=20.0"""
         val = service._get_threshold_value("missing_field_rate", "alert")
         assert val == 20.0
 
@@ -238,7 +254,7 @@ class TestQualityAlertService:
         val = service._get_threshold_value("missing_field_rate", "warn")
         assert val == 10.0
 
-    @patch("database.redis_conn.redis_conn")
+    @patch("services.quality_alert_service.redis_conn")
     def test_check_redis_dedupe_first(self, mock_redis, service):
         """初回チェック"""
         mock_redis.exists.return_value = False
@@ -248,7 +264,7 @@ class TestQualityAlertService:
         assert result is True
         mock_redis.setex.assert_called_once()
 
-    @patch("database.redis_conn.redis_conn")
+    @patch("services.quality_alert_service.redis_conn")
     def test_check_redis_dedupe_duplicate(self, mock_redis, service):
         """重複チェック"""
         mock_redis.exists.return_value = True
@@ -256,7 +272,7 @@ class TestQualityAlertService:
         result = service._check_redis_dedupe("test_metric")
         assert result is False
 
-    @patch("database.redis_conn.redis_conn")
+    @patch("services.quality_alert_service.redis_conn")
     def test_check_redis_dedupe_error(self, mock_redis, service):
         """Redisエラー時は通過"""
         mock_redis.exists.side_effect = Exception("Redis error")
@@ -264,7 +280,7 @@ class TestQualityAlertService:
         result = service._check_redis_dedupe("test_metric")
         assert result is True
 
-    @patch("services.quality_alert_service.SlackNotificationService")
+    @patch("notifier.SlackNotificationService")
     def test_send_slack_alert_configured(self, mock_slack_class, service):
         """Slack設定あり"""
         mock_service = MagicMock()
@@ -275,17 +291,18 @@ class TestQualityAlertService:
         result = service._send_slack_alert("Test message")
         assert result is True
 
-    @patch("services.quality_alert_service.SlackNotificationService")
+    @patch("notifier.SlackNotificationService")
     def test_send_slack_alert_not_configured(self, mock_slack_class, service):
         """Slack未設定"""
         mock_service = MagicMock()
         mock_service.webhook_url = None
+        mock_service.send.return_value = False
         mock_slack_class.return_value = mock_service
         
         result = service._send_slack_alert("Test message")
         assert result is False
 
-    @patch("services.quality_alert_service.LineNotificationService")
+    @patch("notifier.LineNotificationService")
     def test_send_line_alert_configured(self, mock_line_class, service):
         """LINE設定あり"""
         mock_service = MagicMock()
@@ -297,11 +314,12 @@ class TestQualityAlertService:
         result = service._send_line_alert("Test message")
         assert result is True
 
-    @patch("services.quality_alert_service.LineNotificationService")
+    @patch("notifier.LineNotificationService")
     def test_send_line_alert_not_configured(self, mock_line_class, service):
         """LINE未設定"""
         mock_service = MagicMock()
         mock_service.access_token = None
+        mock_service.send.return_value = False
         mock_line_class.return_value = mock_service
         
         result = service._send_line_alert("Test message")
@@ -349,38 +367,43 @@ class TestQualityAlertService:
 class TestSendAlerts:
     """スタンドアロン送信関数のテスト。"""
 
-    @patch("services.alert_manager.create_notification_service")
+    @patch("notifier.create_notification_service")
     def test_send_slack_alert(self, mock_create):
         mock_service = MagicMock()
         mock_service.send.return_value = True
         mock_create.return_value = mock_service
         
+        from services.alert_manager import send_slack_alert
         result = send_slack_alert("Test message")
         assert result is True
 
-    @patch("services.alert_manager.create_notification_service")
+    @patch("notifier.create_notification_service")
     def test_send_slack_alert_failure(self, mock_create):
         mock_service = MagicMock()
         mock_service.send.side_effect = Exception("Error")
         mock_create.return_value = mock_service
         
+        from services.alert_manager import send_slack_alert
         result = send_slack_alert("Test message")
         assert result is False
 
-    @patch("services.alert_manager.create_notification_service")
+    @patch("notifier.create_notification_service")
     def test_send_line_alert(self, mock_create):
         mock_service = MagicMock()
         mock_service.send.return_value = True
         mock_create.return_value = mock_service
         
+        from services.alert_manager import send_line_alert
         result = send_line_alert("Test message")
         assert result is True
 
     def test_send_live_test_report_not_found(self, tmp_path):
+        from services.alert_manager import send_live_test_report
         result = send_live_test_report(tmp_path / "nonexistent.md", 1)
         assert result == {"slack": False, "line": False}
 
     def test_send_live_test_report_success(self, tmp_path):
+        from services.alert_manager import send_live_test_report
         report = tmp_path / "test.md"
         report.write_text("# Report\n- Item 1\n")
         

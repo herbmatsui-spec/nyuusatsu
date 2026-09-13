@@ -1,74 +1,92 @@
-"""URL Registry base classes and common interfaces."""
+"""URL registry package.
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Optional, List
+各レジストリは ``data/`` 以下のCSVまたはテンプレートから URL を読み込み、
+共通の ``RegistryRecord`` で返す。基底クラス ``BaseRegistry`` は
+``get_url(agency_code)`` 等の共通インターフェースを定義する。
+"""
+from __future__ import annotations
 
+import csv
+import os
+import logging
+from pathlib import Path
+from typing import Dict, Iterator, List, Optional
+from dataclasses import dataclass, field
 
-@dataclass
-class RegistryEntry:
-    """Represents a single entry in the URL registry."""
-    municipality_code: str
-    name: str
-    prefecture: str
-    base_url: str
-    bid_url_pattern: str
-    bid_system: str
-    parser_type: str
-    url_type: str  # "prefecture" or "city"
+logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass
 class RegistryRecord:
-    """Record format expected by sync script."""
+    """レジストリ1レコード（ agencies / url_registry 同期の単位）。"""
+
     municipality_code: str
     name: str
-    region: str
     base_url: str
-    bid_url_pattern: str
-    category: str
-    type: str
-    bid_system: str
-    parser_type: str
+    bid_url_pattern: str = ""
+    bid_system: str = ""
+    category: str = ""
+    type: str = ""
+    region: str = ""
+    parser_type: str = "generic"
+    extra: Dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.region in ("", None):
+            self.region = self.name
+        if self.type in ("", None):
+            self.type = "municipality"
 
 
-class BaseRegistry(ABC):
-    """Abstract base class for URL registries."""
+class BaseRegistry:
+    """レジストリ基底クラス。
 
-    @abstractmethod
-    def load(self) -> None:
-        """Load registry data from source (CSV, DB, etc.)."""
-        pass
+    サブクラスは ``iter_records`` を実装し、CSV/テンプレート/ネットから
+    ``RegistryRecord`` を生成する。共通ユーティリティとして ``_read_csv`` と
+    ``get_url`` を提供する。
+    """
 
-    @abstractmethod
-    def get_entry(self, municipality_code: str) -> Optional[RegistryEntry]:
-        """Get registry entry by municipality code."""
-        pass
+    name: str = "base"
 
-    @abstractmethod
-    def get_all_entries(self) -> List[RegistryEntry]:
-        """Get all registry entries."""
-        pass
+    def __init__(self, csv_path: Optional[str] = None) -> None:
+        self.csv_path = csv_path
 
-    @abstractmethod
-    def get_entries_by_prefecture(self, prefecture: str) -> List[RegistryEntry]:
-        """Get entries filtered by prefecture."""
-        pass
+    @staticmethod
+    def _resolve_path(path: Optional[str], default: str) -> str:
+        if path:
+            return path
+        return str(PROJECT_ROOT / default)
+
+    @staticmethod
+    def _read_csv(path: str) -> List[Dict[str, str]]:
+        if not os.path.exists(path):
+            logger.warning("Registry CSV not found: %s", path)
+            return []
+        rows: List[Dict[str, str]] = []
+        with open(path, encoding="utf-8-sig", newline="") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                rows.append({k: (v.strip() if v is not None else "") for k, v in row.items()})
+        logger.info("Loaded %d rows from %s", len(rows), path)
+        return rows
+
+    def iter_records(self) -> Iterator[RegistryRecord]:
+        raise NotImplementedError
+
+    def get_url(self, agency_code: str) -> Optional[str]:
+        """agency_code (municipality_code) に紐付く base_url を返す。"""
+        for rec in self.iter_records():
+            if rec.municipality_code == agency_code:
+                return rec.base_url
+        return None
+
+    def get_record(self, agency_code: str) -> Optional[RegistryRecord]:
+        for rec in self.iter_records():
+            if rec.municipality_code == agency_code:
+                return rec
+        return None
 
     def all_records(self) -> List[RegistryRecord]:
-        """Convert all entries to RegistryRecord format for sync script."""
-        entries = self.get_all_entries()
-        return [
-            RegistryRecord(
-                municipality_code=e.municipality_code,
-                name=e.name,
-                region=e.prefecture,
-                base_url=e.base_url,
-                bid_url_pattern=e.bid_url_pattern,
-                category=e.url_type,
-                type=e.url_type,
-                bid_system=e.bid_system,
-                parser_type=e.parser_type,
-            )
-            for e in entries
-        ]
+        return list(self.iter_records())

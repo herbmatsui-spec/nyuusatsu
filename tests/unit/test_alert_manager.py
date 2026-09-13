@@ -90,6 +90,7 @@ class TestSendAlerts:
     def test_send_slack_alert_not_configured(self, mock_slack_class):
         mock_service = MagicMock()
         mock_service.webhook_url = None
+        mock_service.send.return_value = False  # Not configured returns False
         mock_slack_class.return_value = mock_service
         
         result = send_slack_alert("Test message")
@@ -120,6 +121,7 @@ class TestSendAlerts:
     def test_send_line_alert_not_configured(self, mock_line_class):
         mock_service = MagicMock()
         mock_service.access_token = None
+        mock_service.send.return_value = False  # Not configured returns False
         mock_line_class.return_value = mock_service
         
         result = send_line_alert("Test message")

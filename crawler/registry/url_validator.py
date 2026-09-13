@@ -1,113 +1,97 @@
-"""URL Validator - checks URL accessibility via HEAD/GET requests."""
+"""URLバリデーター。
+
+HEADリクエストを試し、405/403等で失敗した場合は軽量GETでフォールバックして
+URLの到達可否を判定する。タイムアウトを短めに設定し、失敗はスキップ可能にする。
+"""
+from __future__ import annotations
 
 import logging
-import requests
-from typing import Optional
 from dataclasses import dataclass
+from typing import Optional, Tuple
+
+import requests
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_TIMEOUT = 8
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ja,en-US;q=0.7,en;q=0.3",
+}
 
 
 @dataclass
 class ValidationResult:
-    """Result of URL validation."""
     url: str
     is_valid: bool
     status_code: Optional[int]
+    content_type: Optional[str]
     error: Optional[str] = None
-    redirect_url: Optional[str] = None
+
+    @property
+    def is_ok(self) -> bool:
+        return self.is_valid
 
 
 class UrlValidator:
-    """URL Validator class for sync script compatibility."""
+    """URL到達可否をHEAD→GETフォールバックで検証する。"""
 
-    def __init__(self, timeout: int = 10):
+    def __init__(
+        self,
+        timeout: int = DEFAULT_TIMEOUT,
+        headers: Optional[dict] = None,
+        verify: bool = True,
+    ) -> None:
         self.timeout = timeout
+        self.headers = headers or DEFAULT_HEADERS
+        self.verify = verify
 
-    def validate(self, url: str) -> ValidationResult:
-        """Validate a URL."""
-        return validate_url(url, timeout=self.timeout)
+    def validate(self, url: str, method: str = "head") -> ValidationResult:
+        if not url:
+            return ValidationResult(url=url, is_valid=False, status_code=None, content_type=None, error="empty url")
 
+        if method.lower() != "get":
+            try:
+                resp = requests.head(
+                    url, timeout=self.timeout, headers=self.headers, allow_redirects=True, verify=self.verify
+                )
+                if resp.status_code < 400:
+                    return ValidationResult(
+                        url=url, is_valid=True, status_code=resp.status_code,
+                        content_type=resp.headers.get("Content-Type"),
+                    )
+                if resp.status_code not in (403, 405, 400, 404):
+                    return ValidationResult(
+                        url=url, is_valid=False, status_code=resp.status_code,
+                        content_type=resp.headers.get("Content-Type"), error=f"HEAD {resp.status_code}",
+                    )
+            except requests.RequestException as e:
+                logger.debug("HEAD failed for %s: %s", url, e)
 
-def validate_url(
-    url: str,
-    timeout: int = 10,
-    method: str = "HEAD",
-    allow_redirects: bool = True,
-) -> ValidationResult:
-    """Validate a single URL by making an HTTP request.
-    
-    Args:
-        url: URL to validate
-        timeout: Request timeout in seconds
-        method: HTTP method ("HEAD" or "GET")
-        allow_redirects: Whether to follow redirects
-    
-    Returns:
-        ValidationResult with validation status
-    """
-    try:
-        response = requests.request(
-            method=method,
-            url=url,
-            timeout=timeout,
-            allow_redirects=allow_redirects,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; NyuusatsuBot/1.0)"},
-        )
-        
-        is_valid = 200 <= response.status_code < 400
-        redirect_url = response.url if response.url != url else None
-        
-        return ValidationResult(
-            url=url,
-            is_valid=is_valid,
-            status_code=response.status_code,
-            redirect_url=redirect_url,
-            error=None if is_valid else f"HTTP {response.status_code}",
-        )
-    
-    except requests.exceptions.Timeout:
-        return ValidationResult(
-            url=url,
-            is_valid=False,
-            status_code=None,
-            error=f"Timeout after {timeout}s",
-        )
-    except requests.exceptions.ConnectionError:
-        return ValidationResult(
-            url=url,
-            is_valid=False,
-            status_code=None,
-            error="Connection error",
-        )
-    except requests.exceptions.RequestException as e:
-        return ValidationResult(
-            url=url,
-            is_valid=False,
-            status_code=None,
-            error=str(e),
-        )
+        return self._validate_get(url)
+
+    def _validate_get(self, url: str) -> ValidationResult:
+        try:
+            resp = requests.get(
+                url, timeout=self.timeout, headers=self.headers, allow_redirects=True, verify=self.verify
+            )
+            is_valid = resp.status_code < 400
+            if not is_valid:
+                logger.debug("GET %s -> %d", url, resp.status_code)
+            return ValidationResult(
+                url=url, is_valid=is_valid, status_code=resp.status_code,
+                content_type=resp.headers.get("Content-Type"),
+                error=None if is_valid else f"GET {resp.status_code}",
+            )
+        except requests.RequestException as e:
+            return ValidationResult(url=url, is_valid=False, status_code=None, content_type=None, error=str(e))
 
 
-def validate_base_url(base_url: str, timeout: int = 10) -> ValidationResult:
-    """Validate a base URL (typically the main site)."""
-    return validate_url(base_url, timeout=timeout, method="GET")
-
-
-def validate_bid_url(bid_url: str, timeout: int = 10) -> ValidationResult:
-    """Validate a bid/search URL."""
-    return validate_url(bid_url, timeout=timeout, method="HEAD")
-
-
-def validate_registry_entry(entry) -> dict:
-    """Validate both base_url and bid_url_pattern for a registry entry."""
-    base_result = validate_base_url(entry.base_url)
-    bid_result = validate_bid_url(entry.bid_url_pattern)
-    
-    return {
-        "municipality_code": entry.municipality_code,
-        "name": entry.name,
-        "base_url": base_result,
-        "bid_url_pattern": bid_result,
-        "both_valid": base_result.is_valid and bid_result.is_valid,
-    }
+def validate_url(url: str, timeout: int = DEFAULT_TIMEOUT) -> Tuple[bool, Optional[str]]:
+    """便利関数: (is_valid, error_message)。"""
+    result = UrlValidator(timeout=timeout).validate(url)
+    return result.is_valid, result.error

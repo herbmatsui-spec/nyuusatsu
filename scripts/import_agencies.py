@@ -1,124 +1,114 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""都道府県データに基づき agencies テーブルへレコードを投入する。
+
+手順:
+1. prefectures テーブルから都道府県名を取得
+2. data/prefecture_urls.csv から都道府県名と市区町村コードのマッピングを読み込む
+3. 既存の都道府県レコード (category_id=2) を削除
+4. 各都道府県に対して agencies レコードを挿入
+   - name: 都道府県名
+   - type: 空文字列 (後段階で設定)
+   - region: 空文字列 (後段階で設定)
+   - base_url: 空文字列 (後段階で設定)
+   - municipality_code: 都道府県の市区町村コード (6桁)
+   - category_id: 2 (都道府県)
+   - priority_level: 1 (中)
+   - system_type: 空文字列 (後段階で設定)
+   - created_at, updated_at: 現在タイムスタンプ
+"""
+
 import csv
 import os
 import sys
 from datetime import datetime
 
-# プロジェクトルートディレクトリをパスに追加してインポート可能にする
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# プロジェクトルートをパスに追加 (このスクリプトの親の親ディレクトリ)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-from database.session import get_session
-from database.models.agency import Agency
-from database.models.crawl_config import CrawlConfig
-from database.models.agency_category import AgencyCategory
+from sqlalchemy.orm import Session
+from database.session import SessionLocal
+from database.engine import engine
+from database.base import Base
+from database.models import Agency, Prefecture
 
-CSV_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "municipalities.csv")
+def load_prefecture_municipality_code_mapping(csv_path: str) -> dict:
+    """CSVから都道府県名 -> 市区町村コードのマッピングを読み込む。
+    CSVのフォーマット: municipality_code,name,base_url,bid_url_pattern,bid_system,parser_type
+    """
+    mapping = {}
+    try:
+        with open(csv_path, 'r', encoding='utf-8-sig') as f:  # UTF-8 with BOM stripping
+            reader = csv.DictReader(f)
+            for row in reader:
+                name = row['name'].strip()
+                code = row['municipality_code'].strip()
+                if name and code:
+                    mapping[name] = code
+    except Exception as e:
+        print(f"WARNING: Failed to read {csv_path}: {e}", file=sys.stderr)
+    return mapping
 
-def import_agencies():
-    if not os.path.exists(CSV_PATH):
-        print(f"Error: CSV file not found at {CSV_PATH}")
-        sys.exit(1)
+def main() -> None:
+    # テーブルが存在することを確認（存在しなければ作成）
+    Base.metadata.create_all(bind=engine)
 
-    print(f"Reading agencies from {CSV_PATH}...")
-    
-    with open(CSV_PATH, "r", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
+    db: Session = SessionLocal()
+    try:
+        # 既存の都道府県レコードを削除
+        deleted = db.query(Agency).filter(Agency.category_id == 2).delete(synchronize_session=False)
+        db.commit()
+        print(f"Deleted {deleted} existing prefecture agency records.")
 
-    print(f"Loaded {len(rows)} records. Importing into database...")
+        # 都道府県名 -> 市区町村コードのマッピングをロード
+        csv_path = os.path.join(PROJECT_ROOT, 'data', 'prefecture_urls.csv')
+        pref_to_muni = load_prefecture_municipality_code_mapping(csv_path)
+        if not pref_to_muni:
+            print("WARNING: Could not load municipality code mapping from CSV. Falling back to empty municipality_code.")
+            pref_to_muni = {}
 
-    with get_session() as session:
-        try:
-            # カテゴリ「市区町村」のIDを取得
-            category = session.query(AgencyCategory).filter_by(name="市区町村").first()
-            if not category:
-                print("Error: Category '市区町村' not found. Please run scripts/init_categories.py first.")
-                sys.exit(1)
-            
-            category_id = category.id
-            print(f"Using category_id={category_id} for '市区町村'")
+        # 全都道府県を取得
+        prefectures = db.query(Prefecture).order_by(Prefecture.code).all()
+        if not prefectures:
+            print("ERROR: No prefectures found in the database. Run seed_prefectures.py first.")
+            sys.exit(1)
 
-            for i, row in enumerate(rows, 1):
-                name = row.get("name")
-                agency_type = row.get("type")
-                region = row.get("region")
-                base_url = row.get("base_url") or ""
-                target_url = row.get("target_url") or ""
-                parser_type = row.get("parser_type", "heuristic")
-                frequency = row.get("frequency", "daily")
-                municipality_code = row.get("municipality_code")
-                if municipality_code:
-                    municipality_code = municipality_code.strip()
-                    if not municipality_code:
-                        municipality_code = None
-                else:
-                    municipality_code = None
-                    
-                category_name = row.get("category", "市区町村")
-                is_active_str = row.get("is_active", "True").strip()
-                is_active = is_active_str == "True"
+        inserted = 0
+        for pref in prefectures:
+            muni_code = pref_to_muni.get(pref.name, "")
+            # マッピングが見つからない場合は空文字列とする（レコードは挿入されるが、後段階でURLが設定されない可能性がある）
+            agency = Agency(
+                name=pref.name,
+                type="",  # 後段階で設定
+                region="",  # 後段階で設定
+                base_url="",  # 後段階で設定 (ステップ18)
+                municipality_code=muni_code,
+                category_id=2,  # 都道府県 (ステップ16)
+                priority_level=1,  # 中 (デフォルト) (ステップ17)
+                system_type="",  # 後段階で設定
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.add(agency)
+            inserted += 1
 
-                if not name:
-                    print(f"Row {i}: Missing name, skipping.")
-                    continue
+        db.commit()
+        print(f"Inserted {inserted} prefecture agency records.")
 
-                # Agencyの重複チェックと登録
-                agency = session.query(Agency).filter(Agency.name == name).first()
-                if not agency:
-                    now = datetime.utcnow()
-                    agency = Agency(
-                        name=name,
-                        type=agency_type,
-                        region=region,
-                        base_url=base_url,
-                        municipality_code=municipality_code,
-                        category_id=category_id,
-                        priority_level=0,  # 後工程で人口ベースで設定
-                        created_at=now,
-                        updated_at=now,
-                    )
-                    session.add(agency)
-                    session.flush()  # ID取得のためにフラッシュ
-                    print(f"Created Agency: {name} (ID: {agency.id})")
-                else:
-                    # 既存レコードの情報もアップデート
-                    agency.type = agency_type
-                    agency.region = region
-                    agency.base_url = base_url
-                    agency.municipality_code = municipality_code
-                    agency.category_id = category_id
-                    agency.priority_level = 0
-                    agency.updated_at = datetime.utcnow()
-                    print(f"Updated Agency: {name} (ID: {agency.id})")
+        # 確認
+        total = db.query(Agency).filter(Agency.category_id == 2).count()
+        print(f"Total agencies with category_id=2: {total}")
 
-                # CrawlConfigの登録（重複がなければ）
-                if target_url:
-                    config = session.query(CrawlConfig).filter(
-                        CrawlConfig.agency_id == agency.id,
-                        CrawlConfig.target_url == target_url
-                    ).first()
-                    if not config:
-                        config = CrawlConfig(
-                            agency_id=agency.id,
-                            target_url=target_url,
-                            parser_type=parser_type,
-                            frequency=frequency,
-                            is_active=is_active
-                        )
-                        session.add(config)
-                        print(f"  -> Added CrawlConfig for {name}: {target_url} (parser: {parser_type}, active: {is_active})")
-                    else:
-                        config.parser_type = parser_type
-                        config.frequency = frequency
-                        config.is_active = is_active
-                        print(f"  -> Updated CrawlConfig for {name} with target_url: {target_url} (active: {is_active})")
-        except Exception as e:
-            print(f"Error during import: {e}")
-            session.rollback()
-            raise
-        else:
-            session.commit()
-  
-    print("Import completed successfully.")
+        # サンプル表示（最初の3件）
+        samples = db.query(Agency).filter(Agency.category_id == 2).order_by(Agency.id).limit(3).all()
+        print("Sample inserted agencies:")
+        for a in samples:
+            print(f"  ID: {a.id}, Name: {a.name}, Municipality Code: {a.municipality_code or '(empty)'}, Base URL: '{a.base_url or ''}', Priority Level: {a.priority_level}")
+
+    finally:
+        db.close()
 
 if __name__ == "__main__":
-    import_agencies()
+    main()

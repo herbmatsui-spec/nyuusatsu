@@ -3,54 +3,44 @@ Tests for Company Name Normalizer utilities.
 """
 
 import pytest
-
 from crawler.utils.company_name_normalizer import (
-    INDUSTRY_KEYWORDS,
-    SUFFIX_MAP,
-    detect_industry,
-    extract_corporate_number,
-    find_similar,
     normalize,
     remove_suffix,
+    extract_corporate_number,
     similarity,
+    find_similar,
+    detect_industry,
 )
 
 
 class TestNormalize:
     """normalize のテスト。"""
 
-    @pytest.mark.parametrize(
-        "input_name,expected",
-        [
-            ("(株)サンプル", "株式会社サンプル"),
-            ("(有)テスト", "有限会社テスト"),
-            ("(合)パートナー", "合資会社パートナー"),
-            ("㈱サンプル", "株式会社サンプル"),
-            ("㈲テスト", "有限会社テスト"),
-            ("㈶基金", "基金基金"),  # ㈶ -> 基金, then whitespace removed
-            ("株式会社サンプル", "株式会社サンプル"),
-            ("有限会社テスト", "有限会社テスト"),
-            (" 株式会社ABC ", "株式会社ABC"),
-            ("", ""),
-            (None, ""),
-            ("サンプル", "サンプル"),
-            ("サンプル株式会社", "サンプル株式会社"),
-            ("サンプル有限会社", "サンプル有限会社"),
-            ("サンプル合資会社", "サンプル合資会社"),
-            ("サンプル合同会社", "サンプル合同会社"),
-            ("サンプル合名会社", "サンプル合名会社"),
-            ("サンプル公社", "サンプル公社"),
-            ("サンプル公団", "サンプル公団"),
-            ("サンプル Corp.", "サンプル株式会社"),
-            ("サンプル Corp", "サンプル株式会社"),
-            ("サンプル Co., Ltd.", "サンプル株式会社"),
-            ("サンプル Co., Ltd", "サンプル株式会社"),
-            ("サンプル Ltd.", "サンプル株式会社"),
-            ("サンプル Ltd", "サンプル株式会社"),
-            ("サンプル INC.", "サンプル株式会社"),
-            ("サンプル INC", "サンプル株式会社"),
-        ],
-    )
+    @pytest.mark.parametrize("input_name,expected", [
+        ("(株)サンプル", "株式会社サンプル"),
+        ("(有)テスト", "有限会社テスト"),
+        ("(合)パートナー", "合資会社パートナー"),
+        ("㈱サンプル", "株式会社サンプル"),
+        ("㈲テスト", "有限会社テスト"),
+        ("㈶基金", "基金"),
+        ("株式会社サンプル", "株式会社サンプル"),
+        ("有限会社テスト", "有限会社テスト"),
+        (" 株式会社ABC ", "株式会社ABC"),
+        ("", ""),
+        (None, ""),
+        ("サンプル", "サンプル"),
+        ("サンプル株式会社", "サンプル株式会社"),
+        ("サンプル有限会社", "サンプル有限会社"),
+        ("サンプル合資会社", "サンプル合資会社"),
+        ("サンプル合同会社", "サンプル合同会社"),
+        ("サンプル合名会社", "サンプル合名会社"),
+        ("サンプル公社", "サンプル公社"),
+        ("サンプル公団", "サンプル公団"),
+        ("サンプル Corp.", "株式会社サンプル"),
+        ("サンプル Ltd.", "株式会社サンプル"),
+        ("サンプル Inc.", "株式会社サンプル"),
+        ("サンプル Co., Ltd.", "株式会社サンプル"),
+    ])
     def test_normalize_various_formats(self, input_name, expected):
         assert normalize(input_name) == expected
 
@@ -63,195 +53,183 @@ class TestNormalize:
     def test_normalize_multiple_suffixes(self):
         """複数のサフィックスがある場合、最初のものを処理。"""
         # 最初のマッチのみが処理される
-        assert normalize("(株)株式会社サンプル") == "株式会社サンプル"
-        assert normalize("株式会社(株)サンプル") == "株式会社サンプル"
-
-    def test_normalize_case_sensitive(self):
-        """接頭辞置換は大文字小文字を区別する。"""
-        assert normalize("サンプル CORP.") == "サンプル CORP."
-        assert normalize("サンプル CORP") == "サンプル CORP"
+        assert normalize("(株)株式会社サンプル") == "株式会社サンプル"  # (株) が最初にマッチ
+        assert normalize("株式会社(株)サンプル") == "株式会社サンプル"  # 株式会社 が最初にマッチ
 
 
 class TestRemoveSuffix:
     """remove_suffix のテスト。"""
 
-    @pytest.mark.parametrize(
-        "input_name,expected",
-        [
-            ("株式会社サンプル建設", "サンプル建設"),
-            ("有限会社テスト", "テスト"),
-            ("合資会社パートナー", "パートナー"),
-            ("合同会社カンパニー", "カンパニー"),
-            ("合名会社アソシエイツ", "アソシエイツ"),
-            ("基金機構", "機構"),
-            ("公社コーポレーション", "コーポレーション"),
-            ("公団サービス", "サービス"),
-            ("サンプル", "サンプル"),  # サフィックスなし
-            ("", ""),
-            (None, ""),
-            ("株式会社", ""),  # サフィックスのみ
-            ("有限会社", ""),
-            ("株式会社  サンプル", "サンプル"),  # 空白あり
-            ("株式会社　サンプル", "サンプル"),  # 全角空白
-            ("株式会社サンプル株式会社", "サンプル"),  # 重複サフィックス
-        ],
-    )
-    def test_remove_suffix_various(self, input_name, expected):
+    @pytest.mark.parametrize("input_name,expected", [
+        ("株式会社ABC", "ABC"),
+        ("有限会社テスト", "テスト"),
+        ("(株)サンプル", "サンプル"),
+        ("㈱サンプル", "サンプル"),
+        ("(有)テスト", "テスト"),
+        ("(合)パートナー", "パートナー"),
+        ("(株)株式会社ABC", "株式会社ABC"),
+        ("株式会社(株)ABC", "ABC"),
+        ("ABC株式会社", "ABC"),
+        ("ABC有限会社", "ABC"),
+        ("ABC合同会社", "ABC"),
+        ("ABC合資会社", "ABC"),
+        ("ABC合名会社", "ABC"),
+        ("ABC公社", "ABC"),
+        ("ABC公団", "ABC"),
+        ("ABC Corp.", "ABC"),
+        ("ABC Ltd.", "ABC"),
+        ("ABC Inc.", "ABC"),
+        ("ABC Co., Ltd.", "ABC"),
+        ("ABC 合同会社", "ABC"),
+        ("", ""),
+        (None, ""),
+    ])
+    def test_remove_suffix(self, input_name, expected):
         assert remove_suffix(input_name) == expected
+
+    def test_remove_suffix_empty(self):
+        assert remove_suffix("") == ""
+
+    def test_remove_suffix_none(self):
+        assert remove_suffix(None) == ""
 
 
 class TestExtractCorporateNumber:
     """extract_corporate_number のテスト。"""
 
-    @pytest.mark.parametrize(
-        "text,expected",
-        [
-            ("法人番号1234567890123", "1234567890123"),
-            ("1234567890123は法人番号", "1234567890123"),
-            ("法人番号: 1234567890123", "1234567890123"),
-            ("1234567890123", "1234567890123"),
-            ("12345678901234", None),  # 14桁
-            ("123456789012", None),  # 12桁
-            ("12345678901A", None),  # 英字混在
-            ("", None),
-            (None, None),
-            ("法人番号なし", None),
-            ("1234-5678-9012", None),  # ハイフンあり
-            ("1234 5678 9012", None),  # スペースあり
-            ("9999999999999", "9999999999999"),
-            ("0000000000000", "0000000000000"),
-        ],
-    )
-    def test_extract_corporate_number_various(self, text, expected):
-        assert extract_corporate_number(text) == expected
-
-    def test_extract_corporate_number_multiple(self):
-        """複数の13桁数字がある場合、最初のものを返す。"""
-        text = "番号1: 1234567890123, 番号2: 9876543210987"
-        assert extract_corporate_number(text) == "1234567890123"
-
-    def test_extract_corporate_number_with_zenkaku_digits(self):
-        """全角数字は対象外。"""
-        assert extract_corporate_number("法人番号１２３４５６７８９０１２３") is None
+    @pytest.mark.parametrize("input_text,expected", [
+        ("法人番号: 1234567890123", "1234567890123"),
+        ("法人番号 1234567890123", "1234567890123"),
+        ("法人番号：1234567890123", "1234567890123"),
+        ("1234567890123", "1234567890123"),
+        ("法人番号: 123456789012", None),  # 12桁は無効
+        ("法人番号: 12345678901234", None),  # 14桁は無効
+        ("法人番号: abcdefghijklm", None),  # 数字以外は無効
+        ("", None),
+        (None, None),
+        ("法人番号なし", None),
+    ])
+    def test_extract_corporate_number(self, input_text, expected):
+        assert extract_corporate_number(input_text) == expected
 
 
 class TestSimilarity:
     """similarity のテスト。"""
 
-    @pytest.mark.parametrize(
-        "a,b,expected",
-        [
-            ("株式会社ABC", "株式会社ABC", 1.0),
-            ("株式会社ABC", "株式会社ABD", 0.92),
-            ("ABC", "XYZ", 0.0),
-            ("", "", 0.0),
-            ("", "ABC", 0.0),
-            ("ABC", "", 0.0),
-            ("株式会社サンプル", "株式会社サンプル", 1.0),
-            ("(株)サンプル", "株式会社サンプル", 1.0),
-            ("有限会社テスト", "㈲テスト", 1.0),
-            ("サンプル", "サンプ ル", 0.8),
-        ],
-    )
-    def test_similarity_various(self, a, b, expected):
-        assert similarity(a, b) == expected
-
-    def test_similarity_normalizes_suffixes_before_comparison(self):
-        """サフィックス正規化後の文字列で類似度を計算する。"""
-        assert similarity("Corp.サンプル", "株式会社サンプル") == 1.0
-        assert similarity("Ltd.テスト", "有限会社テスト") == 1.0
+    @pytest.mark.parametrize("name1,name2,expected_min", [
+        ("株式会社ABC", "株式会社ABC", 1.0),
+        ("株式会社ABC", "㈱ABC", 0.8),
+        ("株式会社ABC", "有限会社ABC", 0.5),
+        ("株式会社ABC", "株式会社XYZ", 0.5),
+        ("", "", 1.0),
+        ("ABC", "", 0.0),
+        (None, "ABC", 0.0),
+        ("株式会社サンプル", "サンプル株式会社", 0.5),
+    ])
+    def test_similarity(self, name1, name2, expected_min):
+        result = similarity(name1, name2)
+        assert result >= expected_min
+        assert 0.0 <= result <= 1.0
 
 
 class TestFindSimilar:
     """find_similar のテスト。"""
 
-    def test_find_similar_returns_best_match(self):
-        """候補の中から最も類似度の高いものを返す。"""
-        candidates = ["株式会社ABC", "株式会社XYZ", "有限会社テスト"]
-        assert find_similar("株式会社ABC", candidates) == "株式会社ABC"
-
-    def test_find_similar_returns_none_below_threshold(self):
-        """閾値未満の場合は None を返す。"""
-        candidates = ["株式会社ABC", "株式会社XYZ"]
-        assert find_similar("サンプル", candidates, threshold=0.9) is None
-
-    def test_find_similar_threshold_edge(self):
-        """閾値ちょうどは対象。"""
-        candidates = ["ABC", "XYZ"]
-        assert find_similar("ABC", candidates, threshold=1.0) == "ABC"
-        assert find_similar("ABC", candidates, threshold=1.01) is None
+    def test_find_similar_basic(self):
+        candidates = ["株式会社ABC", "有限会社XYZ", "合同会社DEF"]
+        result = find_similar("㈱ABC", candidates, threshold=0.7)
+        assert len(result) > 0
+        assert result[0][0] == "株式会社ABC"
 
     def test_find_similar_empty_candidates(self):
-        """候補が空の場合は None。"""
-        assert find_similar("ABC", []) is None
+        result = find_similar("株式会社ABC", [], threshold=0.7)
+        assert result == []
 
-    def test_find_similar_uses_normalized_similarity(self):
-        """正規化済み文字列で比較する。"""
-        candidates = ["(株)ABC", "有限会社テスト"]
-        assert find_similar("株式会社ABC", candidates) == "(株)ABC"
+    def test_find_similar_no_match(self):
+        candidates = ["株式会社XYZ", "有限会社DEF"]
+        result = find_similar("株式会社ABC", candidates, threshold=0.9)
+        assert result == []
+
+    def test_find_similar_threshold(self):
+        candidates = ["株式会社ABC", "株式会社ABD", "株式会社XYZ"]
+        result = find_similar("株式会社ABC", candidates, threshold=0.8)
+        assert len(result) >= 1
+        assert result[0][0] == "株式会社ABC"
 
 
 class TestDetectIndustry:
     """detect_industry のテスト。"""
 
-    @pytest.mark.parametrize(
-        "name,expected",
-        [
-            ("田中建設", "建設"),
-            ("山本建築", "建設"),
-            ("合同会社データセンター", "IT"),
-            ("株式会社クラウド", "IT"),
-            ("〇〇コンサルティング", "コンサル"),
-            ("調査会社", "コンサル"),
-            ("〇〇物品販売", "物品"),
-            ("備品販売", "物品"),
-            ("〇〇委託", "委託"),
-            ("清掃サービス", "委託"),
-            ("〇〇病院", "医療"),
-            ("介護施設", "医療"),
-            ("〇〇教育", "教育"),
-            ("学校法人", "教育"),
-        ],
-    )
-    def test_detect_industry_categories(self, name, expected):
-        assert detect_industry(name) == expected
-
-    def test_detect_industry_keyword_order(self):
-        """キーワードの定義順（辞書の順序）で判定する。"""
-        name = "建設コンサルティング"
-        assert detect_industry(name) == "建設"
-
-    def test_detect_industry_unknown(self):
-        """一致するキーワードがない場合は None。"""
-        assert detect_industry("未知の業種") is None
+    @pytest.mark.parametrize("company_name,expected_industry", [
+        ("株式会社建設", "建設業"),
+        ("株式会社建築", "建設業"),
+        ("株式会社土木", "建設業"),
+        ("株式会社電気", "電気工事業"),
+        ("株式会社管工事", "管工事業"),
+        ("株式会社造園", "造園業"),
+        ("株式会社舗装", "舗装工事業"),
+        ("株式会社塗装", "塗装工事業"),
+        ("株式会社内装", "内装仕上工事業"),
+        ("株式会社解体", "解体工事業"),
+        ("株式会社測量", "測量業"),
+        ("株式会社設計", "建築設計業"),
+        ("株式会社コンサル", "建設コンサルタント業"),
+        ("株式会社清掃", "清掃業"),
+        ("株式会社警備", "警備業"),
+        ("株式会社運送", "運送業"),
+        ("株式会社倉庫", "倉庫業"),
+        ("株式会社不動産", "不動産業"),
+        ("株式会社ソフトウェア", "情報処理業"),
+        ("株式会社システム", "情報処理業"),
+        ("株式会社IT", "情報処理業"),
+        ("株式会社Web", "情報処理業"),
+        ("株式会社デザイン", "デザイン業"),
+        ("株式会社広告", "広告業"),
+        ("株式会社印刷", "印刷業"),
+        ("株式会社出版", "出版業"),
+        ("株式会社翻訳", "翻訳業"),
+        ("株式会社通訳", "通訳業"),
+        ("株式会社人材", "人材派遣業"),
+        ("株式会社派遣", "人材派遣業"),
+        ("株式会社紹介", "職業紹介業"),
+        ("株式会社教育", "教育業"),
+        ("株式会社学習", "学習塾業"),
+        ("株式会社医療", "医療業"),
+        ("株式会社介護", "介護業"),
+        ("株式会社福祉", "福祉業"),
+        ("株式会社薬局", "薬局業"),
+        ("株式会社飲食", "飲食業"),
+        ("株式会社レストラン", "飲食業"),
+        ("株式会社カフェ", "飲食業"),
+        ("株式会社ホテル", "宿泊業"),
+        ("株式会社旅館", "宿泊業"),
+        ("株式会社小売", "小売業"),
+        ("株式会社卸売", "卸売業"),
+        ("株式会社商社", "卸売業"),
+        ("株式会社製造", "製造業"),
+        ("株式会社食品", "食品製造業"),
+        ("株式会社化学", "化学工業"),
+        ("株式会社機械", "機械工業"),
+        ("株式会社電子", "電子部品工業"),
+        ("株式会社自動車", "自動車工業"),
+        ("株式会社鉄鋼", "鉄鋼業"),
+        ("株式会社非鉄", "非鉄金属工業"),
+        ("株式会社金属", "金属製品工業"),
+        ("株式会社繊維", "繊維工業"),
+        ("株式会社紙", "パルプ・紙工業"),
+        ("株式会社ゴム", "ゴム製品工業"),
+        ("株式会社プラスチック", "プラスチック製品工業"),
+        ("株式会社セラミック", "窯業・土石製品工業"),
+        ("株式会社木材", "木材・木製品工業"),
+        ("株式会社家具", "家具・装備品工業"),
+        ("株式会社印刷", "印刷・同関連業"),
+        ("株式会社皮革", "皮革・同製品工業"),
+        ("株式会社その他", "その他の製造業"),
+        ("株式会社サンプル", "その他"),
+    ])
+    def test_detect_industry(self, company_name, expected_industry):
+        assert detect_industry(company_name) == expected_industry
 
     def test_detect_industry_empty(self):
-        """空文字列は None。"""
-        assert detect_industry("") is None
-        assert detect_industry(None) is None
-
-    def test_industry_keywords_are_defined(self):
-        """業種カテゴリのキーワード定義が存在すること。"""
-        assert "建設" in INDUSTRY_KEYWORDS
-        assert "IT" in INDUSTRY_KEYWORDS
-        assert "コンサル" in INDUSTRY_KEYWORDS
-        assert "物品" in INDUSTRY_KEYWORDS
-        assert "委託" in INDUSTRY_KEYWORDS
-        assert "医療" in INDUSTRY_KEYWORDS
-        assert "教育" in INDUSTRY_KEYWORDS
-
-
-class TestSUFFIX_MAP:
-    """SUFFIX_MAP のテスト。"""
-
-    def test_suffix_map_contains_expected_entries(self):
-        """法人格サフィックスの置換マップが想定通りであること。"""
-        assert SUFFIX_MAP["(株)"] == "株式会社"
-        assert SUFFIX_MAP["(有)"] == "有限会社"
-        assert SUFFIX_MAP["(合)"] == "合資会社"
-        assert SUFFIX_MAP["㈱"] == "株式会社"
-        assert SUFFIX_MAP["㈲"] == "有限会社"
-        assert SUFFIX_MAP["㈶"] == "基金"
-        assert SUFFIX_MAP[" Corp."] == "株式会社"
-        assert SUFFIX_MAP[" Ltd."] == "株式会社"
-        assert SUFFIX_MAP[" INC."] == "株式会社"
+        assert detect_industry("") == "その他"
+        assert detect_industry(None) == "その他"

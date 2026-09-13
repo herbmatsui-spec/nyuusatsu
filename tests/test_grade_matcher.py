@@ -10,7 +10,6 @@ from config.qualification_grades import (
     GRADE_HIERARCHY,
 )
 from crawler.parsers.grade_parser import (
-    extract_all_grades,
     extract_grade_from_text,
     extract_unified_qualification_number,
     normalize_grade_text,
@@ -90,11 +89,3 @@ class TestGradeParser:
     def test_normalize_grade_text(self):
         assert normalize_grade_text("甲等級") == "A等級"
         assert normalize_grade_text("乙") == "B"
-
-    def test_extract_all_grades(self):
-        assert extract_all_grades("全省庁統一資格 A") == ["A"]
-        assert extract_all_grades("甲等級") == ["A"]
-        assert set(extract_all_grades("A級とB級が必要")) == {"A", "B"}
-        assert set(extract_all_grades("甲等級 乙級 丙級")) == {"A", "B", "C"}
-        assert extract_all_grades("") == []
-        assert extract_all_grades(None) == []
