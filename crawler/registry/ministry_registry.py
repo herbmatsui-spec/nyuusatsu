@@ -3,7 +3,7 @@
 ``data/master_ministries.csv`` から省庁の名前を読み込み、
 base_url は空とし、bid_url_pattern は GEPS 検索 URL を生成して
 ``RegistryRecord`` として返す。CSV 列:
-  agency_name, municipality_code, priority_level
+  agency_name, municipality_code, priority_level, parent_id
 """
 from __future__ import annotations
 
@@ -32,18 +32,20 @@ class MinistryRegistry(BaseRegistry):
     def iter_records(self) -> Iterator[RegistryRecord]:
         rows = self._read_csv(self.csv_path)
         for row in rows:
-            agency_name = (row.get("agency_name") or "").strip()
+            agency_name = (row.get("agency_name") or row.get("name") or "").strip()
             municipality_code = (row.get("municipality_code") or "").strip()
-            priority_level = (row.get("priority_level") or "").strip()
-            bid_url_pattern = self.geps_url(agency_name) if agency_name else ""
+            bid_url_pattern = (row.get("bid_url_pattern") or "").strip()
+            if not bid_url_pattern:
+                bid_url_pattern = self.geps_url(agency_name) if agency_name else ""
             yield RegistryRecord(
                 municipality_code=municipality_code,
                 name=agency_name,
-                base_url="",  # ministries have diverse domains; leave empty
+                base_url=(row.get("base_url") or "").strip(),
                 bid_url_pattern=bid_url_pattern,
-                bid_system="GEPS",
+                bid_system=(row.get("bid_system") or "GEPS").strip(),
                 category="ministry",
                 type="ministry",
-                region="",
-                parser_type="generic",
+                region=(row.get("region") or "").strip(),
+                parser_type=(row.get("parser_type") or "generic").strip(),
+                parent_id=(row.get("parent_id") or "").strip(),
             )

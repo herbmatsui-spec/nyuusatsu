@@ -37,7 +37,10 @@ def get_current_user() -> Optional[User]:
 
     with get_session() as session:
         auth = AuthService(session)
-        return auth.load_user(username)
+        user = auth.load_user(username)
+        if user is None:
+            user = session.query(User).filter(User.username == username).first()
+        return user
 
 
 def require_permission(action: str, resource: str):

@@ -18,5 +18,7 @@ if _spec and _spec.loader:
     _spec.loader.exec_module(_root_config)
     AppConfig = _root_config.AppConfig
     PlanConfig = _root_config.PlanConfig
+    CrawlerConfig = _root_config.CrawlerConfig
+    LLMConfig = _root_config.LLMConfig
 
-__all__ = ["AppConfig", "PlanConfig"]
+__all__ = ["AppConfig", "PlanConfig", "CrawlerConfig", "LLMConfig"]

@@ -25,6 +25,18 @@ services:
     env_file:
       - .env
     command: uvicorn search_api.main:app --host 0.0.0.0 --port 8000
+
+  search_api:
+    build:
+      context: .
+      dockerfile: search_api/Dockerfile
+    ports:
+      - "8001:8000"
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    command: uvicorn search_api.main:app --host 0.0.0.0 --port 8000
     
   admin:
     build: .

@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+def registry_identity(municipality_code: str, name: str) -> str:
+    code = (municipality_code or "").strip()
+    return f"code:{code}" if code else f"name:{name.strip()}"
+
+
 @dataclass
 class RegistryRecord:
     """レジストリ1レコード（ agencies / url_registry 同期の単位）。"""
@@ -31,9 +36,15 @@ class RegistryRecord:
     type: str = ""
     region: str = ""
     parser_type: str = "generic"
+    parent_id: str = ""
     extra: Dict[str, str] = field(default_factory=dict)
 
+    @property
+    def identity(self) -> str:
+        return registry_identity(self.municipality_code, self.name)
+
     def __post_init__(self) -> None:
+        self.parent_id = (self.parent_id or "").strip()
         if self.region in ("", None):
             self.region = self.name
         if self.type in ("", None):

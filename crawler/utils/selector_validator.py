@@ -112,3 +112,23 @@ def validate_selector_config(config: dict[str, Any]) -> dict[str, Any]:
 
 def validate_html_selectors(html: str, config: dict[str, Any], page_type: str | None = None) -> dict[str, Any]:
     return SelectorValidator(config).validate_html(html, page_type=page_type)
+
+
+def validate_selector(html: str, selector: str) -> tuple[bool, int]:
+    try:
+        count = len(BeautifulSoup(html, "html.parser").select(selector))
+    except Exception:
+        return False, 0
+    return count > 0, count
+
+
+def validate_selectors(html: str, selectors: Iterable[str]) -> list[tuple[str, bool, int]]:
+    return [(selector, *validate_selector(html, selector)) for selector in selectors]
+
+
+def find_first_valid_selector(html: str, selectors: Iterable[str]) -> tuple[str, int]:
+    for selector in selectors:
+        valid, count = validate_selector(html, selector)
+        if valid:
+            return selector, count
+    return "", 0

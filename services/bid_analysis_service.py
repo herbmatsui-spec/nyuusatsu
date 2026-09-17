@@ -12,7 +12,7 @@ from database.repositories.customer_repository import CustomerRepository
 from database.repositories.partner_repository import PartnerRepository
 from services.llm_service import LLMService
 from config import AppConfig
-from utils.budget_parser import parse_budget
+from services.extracted_fields_normalizer import normalize_extracted_fields
 from ocr import is_scanned_pdf, create_ocr_provider, OCRConfig
 from ocr.metrics import record_fallback, record_normal_extract
 
@@ -165,62 +165,45 @@ class BidAnalysisService:
                 "organization_name": "不明",
             }
         
-        # 3. データの保存
-        logger.info("Saving bid details to DB...")
-        
-        # source_url または filename をベースに UPSERT 処理を行う
-        # 予算・納期・資格などの解析結果を更新し、重複レコードを防ぐ
-        bid_data = {
-            "filename": filename,
-            "source_url": source_url,
-        }
-        # 解析結果を bid_data に追加
-        bid, is_new = self.bid_repo.upsert(bid_data)
-
-        # LLM解析結果のマッピング
-        # すでに upsert で basic info は更新済みのため、解析詳細を更新
-        bid.budget = str(analysis_result.get("budget", "記載なし"))
-        
-        # qualifications と key_risks はリストで返される場合があるため、JSON文字列化して格納
-        quals = analysis_result.get("qualifications", [])
-        if isinstance(quals, list):
-            bid.qualifications = json.dumps(quals, ensure_ascii=False)
-        else:
-            bid.qualifications = str(quals)
-
-        bid.deadline = str(analysis_result.get("deadline", "記載なし"))
-        bid.deliverables = str(analysis_result.get("deliverables", "記載なし"))
-
-        risks = analysis_result.get("key_risks", [])
-        if isinstance(risks, list):
-            bid.key_risks = json.dumps(risks, ensure_ascii=False)
-        else:
-            bid.key_risks = str(risks)
-
-        # 追加の解析項目
-        bid.industry_category = str(analysis_result.get("industry_category", "不明"))
-        bid.organization_name = str(analysis_result.get("organization_name", "不明"))
-        
-        # 予算金額の数値化
-        bid.budget_amount = parse_budget(bid.budget)
-        bid.full_text = text
-        bid.analyzed_at = datetime.now(timezone.utc)
-        
-        self.session.flush()
-
-        # ステータス履歴の追加 (新規案件時のみ)
-        if is_new:
-            self.bid_repo.add_status_history(
-                bid_id=bid.id,
-                status="未確認",
-                changed_by="system",
-                memo="新着自治体クロール経由で自動検知"
-            )
-
-        # 4. マッチング処理の呼び出し
-        self.match_customers_and_partners(bid)
-
-        self.session.commit()
+        fields = normalize_extracted_fields(analysis_result)
+        if not isinstance(analysis_result, dict):
+            analysis_result = {}
+        try:
+            bid = self.bid_repo.first_by(source_url=source_url) if source_url else None
+            if bid is None:
+                bid = self.bid_repo.first_by(filename=filename)
+            is_new = bid is None
+            now = datetime.now(timezone.utc)
+            if bid is None:
+                bid = Bid(filename=filename, current_status="未確認", created_at=now)
+                self.session.add(bid)
+            bid.filename = filename
+            bid.source_url = source_url
+            for key, value in fields.items():
+                setattr(bid, key, value)
+            risks = analysis_result.get("key_risks", [])
+            bid.key_risks = json.dumps(risks, ensure_ascii=False) if isinstance(risks, list) else str(risks)
+            bid.industry_category = str(analysis_result.get("industry_category", "不明"))
+            bid.organization_name = str(analysis_result.get("organization_name", "不明"))
+            bid.full_text = text
+            bid.specification_text = text
+            bid.analyzed_at = now
+            bid.updated_at = now
+            self.session.flush()
+            if is_new:
+                self.session.add(BidStatus(
+                    bid_id=bid.id,
+                    status="未確認",
+                    changed_at=now,
+                    changed_by="system",
+                    memo="新着自治体クロール経由で自動検知",
+                ))
+            self.match_customers_and_partners(bid)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            logger.exception("Bid analysis persistence failed; transaction rolled back")
+            raise
         logger.info(f"Bid analysis pipeline completed successfully for Bid ID: {bid.id}")
         return bid
 
@@ -239,7 +222,7 @@ class BidAnalysisService:
         bid_text_lower = bid_text.lower()
 
         # 1. 顧客マッチング
-        customers = self.customer_repo.list_all(limit=1000)
+        customers = self.customer_repo.query().limit(1000).all()
         for customer in customers:
             # 顧客のmemoやcompany名、nameをカンマやスペース等で簡易分割し、キーワードを抽出
             keywords = self._extract_matching_keywords(customer.memo, customer.company, customer.name)
@@ -251,13 +234,14 @@ class BidAnalysisService:
                 link = CustomerBidLink(
                     customer_id=customer.id,
                     bid_id=bid.id,
+                    linked_at=datetime.now(timezone.utc),
                     memo=memo
                 )
                 self.session.add(link)
                 logger.info(f"Customer Match: Customer {customer.name} (ID: {customer.id}) linked to Bid {bid.id}")
 
         # 2. パートナーマッチング
-        partners = self.partner_repo.list_all(limit=1000)
+        partners = self.partner_repo.query().limit(1000).all()
         for partner in partners:
             keywords = self._extract_matching_keywords(partner.memo, partner.category, partner.name)
             
@@ -267,6 +251,7 @@ class BidAnalysisService:
                 link = PartnerBidLink(
                     partner_id=partner.id,
                     bid_id=bid.id,
+                    linked_at=datetime.now(timezone.utc),
                     memo=memo
                 )
                 self.session.add(link)

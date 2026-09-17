@@ -80,7 +80,7 @@ def test_get_highest_compatible_grade():
     # 互換等級が存在する場合は最初の要素を返すことを確認
     # ここでは、モックを使わずに実際の設定に依存するテストを書く
     # ただし、設定が変更されるとテストが失敗する可能性がある
-    # 代わりに、get_compatible_gramsをモックしてテストする
+    # 代わりに、get_compatible_gradesをモックしてテストする
     # しかし、ここでは実際の設定に依存するテストを書く
     # 設定を見ると、A: [A, B, C, D], B: [B, C, D], C: [C, D], D: [D]
     # したがって、Aの最高互換等級はA、BはB、CはC、DはD
@@ -106,25 +106,25 @@ def test_grade_matches():
     assert result["company_grade"] == "A"
     assert result["required_grade"] is None
     assert result["can_apply"] is True  # 必要等級がNoneだとTrue
-    assert result["compatible_grams"] == ["A", "B", "C", "D"]  # Aの互換等量
+    assert result["compatible_grades"] == ["A", "B", "C", "D"]  # Aの互換等級
     # 両方None
     result = grade_matches(None, None)
     assert result["company_grade"] is None
     assert result["required_grade"] is None
     assert result["can_apply"] is True
-    assert result["compatible_grams"] == []
+    assert result["compatible_grades"] == []
     # 通常のケース
     result = grade_matches("A", "C")
     assert result["company_grade"] == "A"
     assert result["required_grade"] == "C"
     assert result["can_apply"] is True
-    assert result["compatible_grams"] == ["A", "B", "C", "D"]
+    assert result["compatible_grades"] == ["A", "B", "C", "D"]
     # 適用不可能なケース
     result = grade_matches("C", "A")
     assert result["company_grade"] == "C"
-    assert result["required_grade"] == "A
+    assert result["required_grade"] == "A"
     assert result["can_apply"] is False
-    assert result["compatible_grams"] == ["C", "D"]
+    assert result["compatible_grades"] == ["C", "D"]
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

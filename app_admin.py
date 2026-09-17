@@ -22,6 +22,7 @@ from database.models import BackfillJob, BackfillJobStatus, BackfillJobLog, Agen
 from database.models.quality_alert import QualityAlert
 from services.backfill_service import BackfillService
 from services.quality_alert_service import QualityAlertService
+from services.model_tuning import render_model_tuning
 
 
 def render():
@@ -31,6 +32,9 @@ def render():
 
     with get_session() as session:
         auth = AuthService(session)
+
+        with st.expander("予測モデルチューニング"):
+            render_model_tuning(session)
 
         with tab1:
             st.subheader("組織")

@@ -37,3 +37,23 @@ metrics:
     warning: 90.0
     critical: 80.0
     lower_is_worse: true
+  llm_missing_budget_amount_rate:
+    warning: 50.0
+    critical: 80.0
+    lower_is_worse: false
+  llm_missing_qualifications_rate:
+    warning: 50.0
+    critical: 80.0
+    lower_is_worse: false
+  llm_missing_delivery_deadline_rate:
+    warning: 60.0
+    critical: 85.0
+    lower_is_worse: false
+  llm_missing_deliverables_rate:
+    warning: 50.0
+    critical: 80.0
+    lower_is_worse: false
+  llm_budget_anomaly_rate:
+    warning: 5.0
+    critical: 15.0
+    lower_is_worse: false

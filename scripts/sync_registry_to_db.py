@@ -28,6 +28,7 @@ from database.engine import get_session
 from database.models import Agency, UrlRegistry, AgencyCategory
 
 from crawler.registry import RegistryRecord
+from utils.string_normalizer import normalize_records
 from crawler.registry.prefecture_registry import PrefectureRegistry
 from crawler.registry.city_registry import CityRegistry
 from crawler.registry.municipality_registry import MunicipalityRegistry
@@ -85,12 +86,50 @@ def load_category_map(session) -> Dict[str, int]:
 
 
 def resolve_category_id(session, cat_map: Dict[str, int], category: str) -> Optional[int]:
-    if not category:
-        return None
-    jp_name = CATEGORY_NAME_MAP.get(category)
-    if jp_name is None:
-        return None
-    return cat_map.get(jp_name)
+    category = (category or "").strip()
+    jp_name = CATEGORY_NAME_MAP.get(category, category)
+    category_id = cat_map.get(jp_name)
+    if category_id is None:
+        raise ValueError(f"Unknown or unseeded category: {category!r}")
+    return category_id
+
+
+def find_agency(session, record: RegistryRecord, category_id: Optional[int]):
+    code = (record.municipality_code or "").strip()
+    if code:
+        agency = session.query(Agency).filter(Agency.municipality_code == code).one_or_none()
+        if agency is not None and agency.category_id not in (None, category_id):
+            raise ValueError(f"Category conflict for municipality code: {code}")
+        return agency
+    agency = session.query(Agency).filter(
+        Agency.name == record.name, Agency.category_id == category_id,
+        (Agency.municipality_code.is_(None)) | (Agency.municipality_code == ""),
+    ).one_or_none()
+    if agency is None:
+        agency = session.query(Agency).filter(
+            Agency.name == record.name,
+            Agency.category_id.is_(None),
+            (Agency.municipality_code.is_(None)) | (Agency.municipality_code == ""),
+        ).one_or_none()
+    return agency
+
+
+def find_url_registry(session, record: RegistryRecord, category_id: Optional[int]):
+    query = session.query(UrlRegistry)
+    code = (record.municipality_code or "").strip()
+    if code:
+        existing = query.filter(UrlRegistry.municipality_code == code).one_or_none()
+        if existing is not None and existing.category_id not in (None, category_id):
+            raise ValueError(f"Category conflict for municipality code: {code}")
+        return existing
+    query = query.filter(
+        (UrlRegistry.municipality_code == "") | UrlRegistry.municipality_code.is_(None),
+        UrlRegistry.agency_name == record.name,
+    )
+    existing = query.filter(UrlRegistry.category_id == category_id).one_or_none()
+    if existing is None:
+        existing = query.filter(UrlRegistry.category_id.is_(None)).one_or_none()
+    return existing
 
 
 def upsert_agency(
@@ -103,10 +142,12 @@ def upsert_agency(
     category_id = resolve_category_id(session, cat_map, record.category)
     now = datetime.utcnow()
 
-    if record.municipality_code:
-        agency = session.query(Agency).filter(Agency.municipality_code == record.municipality_code).first()
-    else:
-        agency = session.query(Agency).filter(Agency.name == record.name).filter(Agency.category_id == category_id).first()
+    if not record.name.strip():
+        raise ValueError("Agency name must not be empty")
+    agency = find_agency(session, record, category_id)
+    if (agency is not None and not record.municipality_code and agency.region
+            and record.region and agency.region != record.region):
+        raise ValueError(f"Conflicting regions for codeless agency: {record.name!r}")
 
     if agency is None:
         agency = Agency(
@@ -126,11 +167,8 @@ def upsert_agency(
         session.flush()
         return f"created {agency.id}"
 
-    if only_unset and (agency.base_url or ""):
-        return "skipped(base_url already set)"
-
     changed = False
-    if record.base_url and (agency.base_url or "") != record.base_url:
+    if record.base_url and (not only_unset or not agency.base_url) and (agency.base_url or "") != record.base_url:
         agency.base_url = record.base_url
         changed = True
     if record.name and (agency.name or "") != record.name:
@@ -158,12 +196,7 @@ def upsert_agency(
 def upsert_url_registry(session, record: RegistryRecord, cat_map: Dict[str, int]) -> str:
     """url_registry テーブルへ UPSERT。search_url に bid_url_pattern を格納。"""
     category_id = resolve_category_id(session, cat_map, record.category)
-    existing = (
-        session.query(UrlRegistry)
-        .filter(UrlRegistry.municipality_code == record.municipality_code)
-        .filter(UrlRegistry.agency_name == record.name)
-        .first()
-    )
+    existing = find_url_registry(session, record, category_id)
 
     if record.bid_url_pattern:
         search_url = record.bid_url_pattern
@@ -187,6 +220,9 @@ def upsert_url_registry(session, record: RegistryRecord, cat_map: Dict[str, int]
         return "created"
 
     updated = False
+    if existing.agency_name != record.name:
+        existing.agency_name = record.name
+        updated = True
     if record.base_url and existing.base_url != record.base_url:
         existing.base_url = record.base_url
         updated = True
@@ -201,6 +237,98 @@ def upsert_url_registry(session, record: RegistryRecord, cat_map: Dict[str, int]
         updated = True
     session.flush()
     return "updated" if updated else "unchanged"
+
+
+def resolve_parent(session, model, reference: str):
+    name_column = model.name if model is Agency else model.agency_name
+    if reference.startswith("code:"):
+        query = session.query(model).filter(model.municipality_code == reference[5:])
+    elif reference.startswith("name:"):
+        query = session.query(model).filter(name_column == reference[5:])
+    else:
+        query = session.query(model).filter(
+            (model.municipality_code == reference) | (name_column == reference)
+        )
+    matches = query.all()
+    if len(matches) != 1:
+        reason = "Missing" if not matches else "Ambiguous"
+        raise ValueError(f"{reason} parent {reference!r} in {model.__tablename__}")
+    return matches[0]
+
+
+def validate_parent_graph(session, model, proposed: Dict[int, int]) -> None:
+    parents = {row.id: row.parent_id for row in session.query(model).all()}
+    parents.update(proposed)
+    visited = set()
+    for start in parents:
+        path = set()
+        current = start
+        while current is not None and current not in visited:
+            if current in path:
+                raise ValueError(f"Cyclic parent in {model.__tablename__}: {current}")
+            if current not in parents:
+                raise ValueError(f"Missing parent in {model.__tablename__}: {current}")
+            path.add(current)
+            current = parents[current]
+        visited.update(path)
+
+
+def preprocess_records(records, aliases=None, timestamp_field="updated_at"):
+    records = normalize_records(records, aliases, timestamp_field)
+    scopes = {}
+    for record in records:
+        if record.municipality_code:
+            continue
+        key = (record.name, CATEGORY_NAME_MAP.get(record.category, record.category))
+        scope = (record.region, record.parent_id)
+        if key in scopes and scopes[key] != scope:
+            raise ValueError(f"Conflicting parents or regions for codeless agency: {record.name!r}")
+        scopes[key] = scope
+    return records
+
+
+def sync_records(session, records: List[RegistryRecord], only_unset: bool = False, aliases=None):
+    records = preprocess_records(records, aliases)
+    results = []
+    with session.begin_nested():
+        cat_map = load_category_map(session)
+        rows = []
+        for record in records:
+            action = upsert_agency(session, record, cat_map, only_unset)
+            raction = upsert_url_registry(session, record, cat_map)
+            category_id = resolve_category_id(session, cat_map, record.category)
+            rows.append((record, find_agency(session, record, category_id),
+                         find_url_registry(session, record, category_id)))
+            results.append((action, raction))
+
+        agency_parents: Dict[int, int] = {}
+        registry_parents: Dict[int, int] = {}
+        for record, agency, registry in rows:
+            if not record.parent_id:
+                continue
+            parent_agency = resolve_parent(session, Agency, record.parent_id)
+            parent_registry = resolve_parent(session, UrlRegistry, record.parent_id)
+            if not record.municipality_code:
+                for child, parent in ((agency, parent_agency), (registry, parent_registry)):
+                    if child.parent_id is not None and child.parent_id != parent.id:
+                        raise ValueError(f"Conflicting parents for codeless agency: {record.name!r}")
+            for proposed, child, parent in (
+                (agency_parents, agency, parent_agency),
+                (registry_parents, registry, parent_registry),
+            ):
+                if child.id in proposed and proposed[child.id] != parent.id:
+                    raise ValueError(f"Conflicting parents for {record.identity}")
+                proposed[child.id] = parent.id
+
+        validate_parent_graph(session, Agency, agency_parents)
+        validate_parent_graph(session, UrlRegistry, registry_parents)
+        for record, agency, registry in rows:
+            if agency.id in agency_parents:
+                agency.parent_id = agency_parents[agency.id]
+            if registry.id in registry_parents:
+                registry.parent_id = registry_parents[registry.id]
+        session.flush()
+    return results
 
 
 def collect_records(registry_type: str, registry_path: Optional[str] = None) -> List[RegistryRecord]:
@@ -228,7 +356,7 @@ def main() -> None:
     parser.add_argument("--validate", action="store_true", help="Validate URLs via HEAD/GET before syncing.")
     args = parser.parse_args()
 
-    records = collect_records(args.type, args.registry_path)
+    records = preprocess_records(collect_records(args.type, args.registry_path))
     logger.info("Loaded %d records from registry '%s'.", len(records), args.type)
 
     validator = UrlValidator() if args.validate else None
@@ -247,33 +375,32 @@ def main() -> None:
         print(f"\nDry-run summary: {len(records)} records (no changes written, invalid={invalid}).")
         return
 
-    with get_session() as session:
-        cat_map = load_category_map(session)
-        for rec in records:
-            if validator is not None and rec.base_url:
-                res = validator.validate(rec.base_url)
-                if not res.is_valid:
-                    logger.warning("Skipping invalid URL %s (%s): %s", rec.name, rec.base_url, res.error)
-                    invalid += 1
-                    continue
-            try:
-                action = upsert_agency(session, rec, cat_map, args.only_unset)
-                raction = upsert_url_registry(session, rec, cat_map)
-                if action.startswith("created") and raction.startswith("created"):
-                    created += 1
-                    logger.info("CREATED %s (%s) -> %s", rec.name, rec.municipality_code, rec.base_url)
-                elif action.startswith("skipped"):
-                    skipped += 1
-                    logger.info("SKIPPED %s (%s): %s", rec.name, rec.municipality_code, action)
-                else:
-                    updated += 1
-                    logger.info("SYNCED %s (%s): agency[%s] registry[%s]",
-                                rec.name, rec.municipality_code, action, raction)
-            except Exception as e:
-                logger.error("Failed to sync %s: %s", rec.name, e)
-                session.rollback()
+    accepted = []
+    for rec in records:
+        if validator is not None and rec.base_url:
+            res = validator.validate(rec.base_url)
+            if not res.is_valid:
+                logger.warning("Skipping invalid URL %s (%s): %s", rec.name, rec.base_url, res.error)
+                invalid += 1
                 continue
-        session.commit()
+        accepted.append(rec)
+
+    with get_session() as session:
+        try:
+            results = sync_records(session, accepted, args.only_unset)
+            synced = list(zip(accepted, results))
+            session.commit()
+        except Exception:
+            session.rollback()
+            logger.exception("Registry sync rejected; no registry changes committed")
+            raise
+        for rec, (action, raction) in synced:
+            if action.startswith("created") and raction.startswith("created"):
+                created += 1
+            else:
+                updated += 1
+            logger.info("SYNCED %s (%s): agency[%s] registry[%s]",
+                        rec.name, rec.municipality_code, action, raction)
         logger.info("Sync complete: created=%d updated=%d skipped=%d invalid=%d",
                     created, updated, skipped, invalid)
 

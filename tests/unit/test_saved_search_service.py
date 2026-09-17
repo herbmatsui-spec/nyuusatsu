@@ -30,16 +30,45 @@ def db_session():
 
 
 def test_create_and_get_saved_search(db_session):
+    from database.models import User
+    from datetime import datetime
+    import json
+    # Create a user
+    user = User(
+        id=1,
+        username="testuser",
+        email="test@example.com",
+        password_hash="hash",
+        is_active=True,
+        created_at=datetime.utcnow()
+    )
+    db_session.add(user)
+    db_session.commit()
+    
     service = SavedSearchService(db_session)
-    saved = service.create(user_id="u1", name="Web制作", criteria={"keywords": "Web", "min_budget": 5000000})
+    criteria = {"keywords": "Web", "min_budget": 5000000}
+    saved = service.create(user_id="1", name="Web制作", criteria_json=json.dumps(criteria))
     assert saved.id is not None
-    loaded = service.get_active_by_user("u1")
+    loaded = service.get_active_by_user("1")
     assert len(loaded) == 1
     assert loaded[0].name == "Web制作"
 
 
 def test_match_new_bids(db_session):
-    service = SavedSearchService(db_session)
+    from database.models import User, Bid
+    from datetime import datetime
+    import json
+    # Create a user
+    user = User(
+        id=1,
+        username="testuser",
+        email="test@example.com",
+        password_hash="hash",
+        is_active=True,
+        created_at=datetime.utcnow()
+    )
+    db_session.add(user)
+    # Create a bid
     bid = Bid(
         filename="web.pdf",
         source_url="http://x/1",
@@ -52,14 +81,29 @@ def test_match_new_bids(db_session):
     )
     db_session.add(bid)
     db_session.flush()
-    saved = service.create(user_id="u1", name="条件", criteria={"keywords": "web"})
+    service = SavedSearchService(db_session)
+    criteria = {"keywords": "web"}
+    saved = service.create(user_id="1", name="条件", criteria_json=json.dumps(criteria))
     matched = service.match_new_bids(saved, datetime(1970, 1, 1))
     assert len(matched) == 1
     assert matched[0]["id"] == bid.id
 
 
 def test_match_new_bids_excludes_old(db_session):
-    service = SavedSearchService(db_session)
+    import json
+    from database.models import User, Bid
+    from datetime import datetime
+    # Create a user
+    user = User(
+        id=1,
+        username="testuser",
+        email="test@example.com",
+        password_hash="hash",
+        is_active=True,
+        created_at=datetime.utcnow()
+    )
+    db_session.add(user)
+    # Create a bid
     bid = Bid(
         filename="old.pdf",
         source_url="http://x/2",
@@ -70,7 +114,8 @@ def test_match_new_bids_excludes_old(db_session):
     )
     db_session.add(bid)
     db_session.flush()
-    saved = service.create(user_id="u1", name="条件", criteria={})
+    service = SavedSearchService(db_session)
+    saved = service.create(user_id="1", name="条件", criteria_json=json.dumps({}))
     matched = service.match_new_bids(saved, datetime(2021, 1, 1))
     assert matched == []
 

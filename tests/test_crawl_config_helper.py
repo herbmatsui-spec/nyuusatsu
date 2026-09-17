@@ -1,20 +1,19 @@
 import pytest
 from config import CrawlerConfig
-from crawler.utils.crawl_config_helper import get_crawl_config_for_agency, get_all_crawl_targets, CrawlTarget
-from config.award_urls import AWARD_URL_PATTERNS
+from crawler.utils.crawl_config_helper import get_crawl_config_for_agency, get_all_crawl_targets, CrawlTarget, AWARD_URL_PATTERNS
 
 def test_get_crawl_config_for_agency_success():
     """定義済みの機関で正しい CrawlTarget が生成されるかテスト"""
     base_config = CrawlerConfig()
-    agency_key = "tokyo"
-    
+    agency_key = next(iter(AWARD_URL_PATTERNS))
+
     target = get_crawl_config_for_agency(agency_key, base_config)
-    
+
     assert target is not None
     assert isinstance(target, CrawlTarget)
     assert target.agency_key == agency_key
-    assert target.name == AWARD_URL_PATTERNS["tokyo"]["name"]
-    assert target.list_url == AWARD_URL_PATTERNS["tokyo"]["list_url"]
+    assert target.name == AWARD_URL_PATTERNS[agency_key].get("name", "不明")
+    assert target.list_url == AWARD_URL_PATTERNS[agency_key].get("list_url", "")
     assert target.user_agent == base_config.user_agent
     assert target.timeout == base_config.request_timeout
 
@@ -28,7 +27,7 @@ def test_get_all_crawl_targets():
     """すべてのターゲットが正しく抽出されるかテスト"""
     base_config = CrawlerConfig()
     targets = get_all_crawl_targets(base_config)
-    
+
     assert isinstance(targets, dict)
     assert len(targets) == len(AWARD_URL_PATTERNS)
     for key in AWARD_URL_PATTERNS.keys():

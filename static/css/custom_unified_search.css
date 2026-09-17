@@ -1,0 +1,33 @@
+[data-testid="stMainBlockContainer"] {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+[data-testid="stSidebar"] label {
+    font-size: 0.95rem;
+}
+
+[data-testid="stFormSubmitButton"] button,
+[data-testid="stDownloadButton"] button {
+    background-color: #176b45;
+    color: #ffffff;
+    border-radius: 0.35rem;
+    font-weight: 600;
+}
+
+[data-testid="stFormSubmitButton"] button:hover,
+[data-testid="stDownloadButton"] button:hover {
+    background-color: #115235;
+    color: #ffffff;
+}
+
+[data-testid="stFormSubmitButton"] button:focus-visible,
+[data-testid="stDownloadButton"] button:focus-visible {
+    outline: 3px solid #e7a51d;
+    outline-offset: 2px;
+}
+
+[data-testid="stDataFrame"] {
+    border: 1px solid #aaaaaa;
+    border-radius: 0.35rem;
+}

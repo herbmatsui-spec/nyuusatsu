@@ -32,14 +32,14 @@ class ManualQuasiRegistry(BaseRegistry):
     def iter_records(self) -> Iterator[RegistryRecord]:
         rows = self._read_csv(self.csv_path)
         for row in rows:
-            agency_name = (row.get("agency_name") or "").strip()
+            agency_name = (row.get("agency_name") or row.get("name") or "").strip()
             base_url = (row.get("base_url") or "").strip()
             note = (row.get("note") or "").strip()
             bid_url_pattern = (row.get("bid_url_pattern") or "").strip()
             if not bid_url_pattern:
                 bid_url_pattern = self.geps_url(agency_name)
             yield RegistryRecord(
-                municipality_code="",  # quasi agencies have no municipality code
+                municipality_code=(row.get("municipality_code") or "").strip(),
                 name=agency_name,
                 base_url=base_url,
                 bid_url_pattern=bid_url_pattern,
@@ -48,5 +48,6 @@ class ManualQuasiRegistry(BaseRegistry):
                 type="quasi",
                 region="",
                 parser_type="generic",
+                parent_id=(row.get("parent_id") or "").strip(),
                 extra={"note": note} if note else {},
             )

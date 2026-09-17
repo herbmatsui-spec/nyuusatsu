@@ -1,0 +1,60 @@
+qualifications:
+  建設業:
+    keywords:
+      - 建設業許可
+      - 建設業
+    broader:
+      - とび・土工工事業
+      - 建築工事業
+  建設業許可:
+    keywords:
+      - 建設業許可
+      - 建設業の許可
+    broader:
+      - 建設業
+  とび・土工工事業:
+    keywords:
+      - とび・土工工事業
+      - とび土工工事業
+      - とび・土工
+    narrower:
+      - 建設業
+  電気工事業:
+    keywords:
+      - 電気工事業
+      - 電気工事
+  管工事業:
+    keywords:
+      - 管工事業
+      - 配管工事業
+  ISO 9001:
+    keywords:
+      - ISO 9001
+      - ISO9001
+      - ISO九〇〇一
+    broader:
+      - 品質マネジメントシステム
+  ISO 14001:
+    keywords:
+      - ISO 14001
+      - ISO14001
+    broader:
+      - 環境マネジメントシステム
+  全省庁統一資格:
+    keywords:
+      - 全省庁統一資格
+      - 統一資格
+    broader:
+      - 資格
+  情報処理安全確保支援士:
+    keywords:
+      - 情報処理安全確保支援士
+      - RP
+    broader:
+      - 情報セキュリティ
+  一級建築士:
+    keywords:
+      - 一級建築士
+      - 1級建築士
+    broader:
+      - 建築士

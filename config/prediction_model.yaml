@@ -1,0 +1,56 @@
+# Competitive Analysis Prediction Model Configuration
+# 競合分析予測モデル設定
+#
+# This file is loaded by services/prediction_model_config.py and used by:
+#   - services/text_similarity_service.py
+#   - services/bid_difficulty_scorer.py
+#   - services/win_prediction_service.py
+#
+# Administrators can edit this file via the admin panel (app_admin.py > MLモデル設定).
+
+# --- TF-IDF vectorization parameters ---
+# Note: Japanese text has no word boundaries, so we use character n-grams (char_wb)
+# which is the standard approach for CJK text similarity without a tokenizer.
+tfidf:
+  max_features: 5000
+  analyzer: char_wb
+  ngram_range: [2, 5]
+  stop_words: null
+
+# --- Similarity search defaults ---
+similarity:
+  default_n: 10
+  default_threshold: 0.3
+  # Only search within this time window (in months) to reduce O(N) cost
+  time_window_months: 6
+  # Cache size for LRU cache of recent similarity queries
+  cache_size: 100
+
+# --- Bid difficulty scoring (0-100) ---
+# Each weight must sum to 1.0 across all elements.
+difficulty_scorer:
+  weights:
+    budget: 0.30
+    qualifications: 0.20
+    deadline: 0.20
+    competition_rate: 0.15
+    spec_length: 0.15
+  # Normalization constants for log-scale transforms
+  params:
+    budget_log_base: 10
+    spec_length_log_base: 10
+    default_competition_rate: 3.0
+    default_days_to_deadline: 30
+
+# --- Win rate prediction (0-1) ---
+win_predictor:
+  weights:
+    company_win_rate: 0.40
+    difficulty_inverse: 0.30
+    agency_award_trend: 0.20
+    qualification_match: 0.10
+  params:
+    # Fallback values when historical data is unavailable
+    default_company_win_rate: 0.15
+    default_agency_award_rate: 0.30
+    default_qualification_match: 0.50

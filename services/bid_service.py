@@ -15,10 +15,11 @@ class BidService:
     def create_bid_entry(self, bid_data: Dict[str, Any]) -> Optional[int]:
         return self.repository.create(bid_data)
 
-    def get_all_bids(self, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def get_all_bids(self, filters: Optional[Dict[str, Any]] = None, allowed_prefectures: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         # 全案件を取得して辞書にマッピング
         db_bids = self.repository.list_all(limit=1000)
         bids = []
+        scope = set(allowed_prefectures) if allowed_prefectures is not None else None
         for bid in db_bids:
             bid_dict = {
                 "id": bid.id,
@@ -34,7 +35,10 @@ class BidService:
                 "industry_category": bid.industry_category or "不明",
                 "organization_name": bid.organization_name or "不明",
                 "budget_amount": bid.budget_amount,
+                "prefecture_code": getattr(bid, "prefecture_code", None),
             }
+            if scope is not None and bid_dict["prefecture_code"] not in scope:
+                continue
             
             # フィルタ処理
             if filters:

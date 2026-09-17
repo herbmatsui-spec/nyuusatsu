@@ -154,28 +154,60 @@ class ArchiveConfig:
 class PlanConfig:
     """Subscription plan definitions."""
     FREE: str = "free"
+    SINGLE_REGION: str = "single_region"
+    DUAL_REGION: str = "dual_region"
+    NATIONAL: str = "national"
     STANDARD: str = "standard"
     PRO: str = "pro"
     ENTERPRISE: str = "enterprise"
     
     LIMITS: dict = field(default_factory=lambda: {
-        "free": {"search_days": 7, "pdf_extract_daily": 10, "api_requests_monthly": 0, "export": False},
-        "standard": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 1000, "export": True},
-        "pro": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 10000, "export": True},
-        "enterprise": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 100000, "export": True},
+        "standard": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 1000, "export": True, "prefectures": 47, "search_history_days": None},
+        "free": {"search_days": 7, "pdf_extract_daily": 10, "api_requests_monthly": 0, "export": False, "prefectures": 1, "search_history_days": 7},
+        "single_region": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 1000, "export": True, "prefectures": 1, "search_history_days": None},
+        "dual_region": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 1000, "export": True, "prefectures": 2, "search_history_days": None},
+        "national": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 10000, "export": True, "prefectures": 47, "search_history_days": None},
+        "pro": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 10000, "export": True, "prefectures": 47, "search_history_days": None},
+        "enterprise": {"search_days": None, "pdf_extract_daily": None, "api_requests_monthly": 100000, "export": True, "prefectures": 47, "search_history_days": None},
     })
     
     PRICES: dict = field(default_factory=lambda: {
-        "free": 0,
         "standard": 30000,
+        "free": 0,
+        "single_region": 5000,
+        "dual_region": 8000,
+        "national": 24800,
         "pro": 80000,
         "enterprise": 200000,
     })
     
     STRIPE_PRICE_IDS: dict = field(default_factory=lambda: {
-        "standard": os.getenv("STRIPE_PRICE_STANDARD", "price_standard"),
-        "pro": os.getenv("STRIPE_PRICE_PRO", "price_pro"),
-        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE", "price_enterprise"),
+        "single_region": os.getenv("STRIPE_PRICE_SINGLE_REGION", ""),
+        "dual_region": os.getenv("STRIPE_PRICE_DUAL_REGION", ""),
+        "national": os.getenv("STRIPE_PRICE_NATIONAL", ""),
+        "standard": os.getenv("STRIPE_PRICE_STANDARD", ""),
+        "pro": os.getenv("STRIPE_PRICE_PRO", ""),
+        "enterprise": os.getenv("STRIPE_PRICE_ENTERPRISE", ""),
+    })
+    
+    DISPLAY_NAMES: dict = field(default_factory=lambda: {
+        "standard": "旧スタンダード",
+        "free": "無料",
+        "single_region": "シングル地域",
+        "dual_region": "デュアル地域",
+        "national": "全国",
+        "pro": "プロ",
+        "enterprise": "エンタープライズ",
+    })
+    
+    # Plan descriptions for UI
+    DESCRIPTIONS: dict = field(default_factory=lambda: {
+        "free": "1都道府県・過去1週間のみアクセス可能",
+        "single_region": "1都道府県までアクセス可能",
+        "dual_region": "2都道府県までアクセス可能（nsearch.jp相当）",
+        "national": "全47都道府県アクセス可能",
+        "pro": "全国アクセス＋予測分析・APIアクセス",
+        "enterprise": "全国アクセス＋専用サポート・カスタム機能",
     })
 
 @dataclass

@@ -86,4 +86,5 @@ class MunicipalityRegistry(BaseRegistry):
                 type=(row.get("type") or "municipality").strip(),
                 region=(row.get("region") or "").strip() or name,
                 parser_type=(row.get("parser_type") or "generic").strip() or "generic",
+                parent_id=(row.get("parent_id") or "").strip(),
             )

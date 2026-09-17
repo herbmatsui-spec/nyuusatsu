@@ -1,0 +1,90 @@
+/* モバイルファーストUI共通スタイル */
+:root {
+    --mobile-surface: #ffffff;
+    --mobile-border: #e2e8f0;
+    --mobile-text: #1e293b;
+    --mobile-muted: #64748b;
+    --mobile-accent: #1e3a8a;
+}
+
+/* フルワイド・シングルカラム */
+[data-testid="stMainBlockContainer"], .block-container {
+    max-width: 100%;
+    padding: 2.5rem 0.75rem 2rem;
+}
+
+[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] {
+    display: none;
+}
+
+/* タップ領域48px以上 */
+.stButton > button {
+    min-height: 48px;
+    font-size: 16px;
+}
+
+.stTextInput input, .stTextArea textarea,
+.stSelectbox > div > div, .stMultiSelect > div > div,
+.stDateInput input, input[type="text"], input[type="password"] {
+    min-height: 48px;
+    font-size: 16px;
+}
+
+.stRadio [role="radiogroup"] {
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.stRadio [role="radio"] {
+    min-height: 48px;
+    padding: 0 0.5rem;
+    align-items: center;
+}
+
+/* カードの影と丸み */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* 縦向き（既定）では余白を狭く */
+@media (max-width: 640px) {
+    [data-testid="stMainBlockContainer"], .block-container {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    iframe[title="streamlit_videoplayer"], iframe[title="st.iframe"] {
+        display: none;
+    }
+}
+
+/* 横向きでもレイアウト崩れを防ぐ */
+@media (orientation: landscape) and (max-height: 500px) {
+    [data-testid="stHeader"] {
+        display: none;
+    }
+
+    [data-testid="stMainBlockContainer"], .block-container {
+        padding-top: 1rem;
+    }
+}
+
+/* ダークモード（OS設定に追従） */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --mobile-surface: #0f172a;
+        --mobile-border: #334155;
+        --mobile-text: #e2e8f0;
+        --mobile-muted: #94a3b8;
+        --mobile-accent: #93c5fd;
+    }
+
+    body, [data-testid="stMain"] {
+        color: var(--mobile-text);
+    }
+
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background: var(--mobile-surface);
+    }
+}

@@ -14,13 +14,14 @@
 - **高度なアラート機構**：システムヘルスチェック、コンポーネント障害の連続検知、競合出現アラート、品質警告・アラート
 - **スケジューラ統合**：APScheduler によりクロール・健康チェック・朝のダイジェスト・品質メトリクス収集・落札結果クローラを自動実行（`scheduler.py`）
 - **バックフィルシステム**：過去データ遡及取得ジョブ管理、`BackfillJob`/`BackfillJobLog` モデル、重複排除・データ品質向上サービス
-- **認証・課金システム**：Stripe連携によるプラン管理（Free/Standard/Pro/Enterprise）、機能制限・無料トライアル、顧客ポータル
+- **認証・課金システム**：Stripe連携による地域別プラン管理（Free/シングル地域/デュアル地域/全国/Pro/Enterprise）、都道府県アクセス制御・無料トライアル、顧客ポータル
 - **予測機能**：入札結果予測ダッシュボード、予測リストビュー、予測データ取得・解析モジュール
 - **カンバンボード**：タスク管理ビューとしてのカンバンボード実装
 - **システム観測性**：リアルタイムシステムメトリクス・ログ監視ダッシュボード
 - **入札履歴ビュー**：過去の入札データを時系列で閲覧・検索可能なビュー
 - **GEPSライブテスト**：本番環境でのGEPSシステム連携テストインフラストラクチャ（自動レポート生成、Slack/LINE通知、GitHub Actions連携）
 - **検索APIマイクロサービス**：資格認証・検索機能を提供する独立したAPIサービス
+  - API仕様書・起動方法は [README_API.md](README_API.md) を参照
 - **UI 改善**：管理画面に QA、しきい値、システム設定タブ追加、ダッシュボードにデータ品質タブ、カスタム CSS (`static/css/custom_dashboard.css`)
 - **テスト・CI**：ユニットテストが 21 件全て成功、`pytest`・`py_compile` による自動検証
 
@@ -91,7 +92,9 @@ LINE_USER_ID=your_line_user_id
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_PUBLISHABLE_KEY=pk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
-STRIPE_PRICE_STANDARD=price_standard_id
+STRIPE_PRICE_SINGLE_REGION=price_single_region_id
+STRIPE_PRICE_DUAL_REGION=price_dual_region_id
+STRIPE_PRICE_NATIONAL=price_national_id
 STRIPE_PRICE_PRO=price_pro_id
 STRIPE_PRICE_ENTERPRISE=price_enterprise_id
 STRIPE_SUCCESS_URL=http://localhost:8501/billing/success
@@ -119,30 +122,91 @@ python verify_db.py
 ```bash
 streamlit run app.py   # PDF 1 件抽出・簡易検索 UI
 ```
-### 2. 分析ダッシュボード（KPI・競合・品質）
+### 統一検索ポータル
+プロジェクトルートで実行します。別DBを使う場合は `DATABASE_URL` を環境変数として設定してください。
+
+```bash
+alembic upgrade head
+streamlit run app_unified_search.py
+```
+
+- タイトルは既存の `Bid.filename` を使用し、キーワードはタイトルと `notes` を検索します。
+- 空白区切りはAND検索、ORは任意の語に一致、NOTはいずれかの語を含む案件を除外します。同時指定はNOTが優先です。
+- 都道府県は複数選択、発注機関は部分一致、入札方式は `Bid.bid_type` の完全一致です。未指定は全件が対象です。
+- 既存案件の入札方式は自動推定しません。未登録（NULL）の案件は方式指定時に除外されます。
+- 「検索」で確定した条件をページ移動中も保持し、新しい検索は1ページ目に戻ります。
+- 1ページ20件、CSVは表示中のページのみをUTF-8 BOM付きで出力します。
+- 既存のStreamlit/Flask画面は引き続き利用できます。外部公開時は既存の認証・アクセス制御下に配置してください。
+
+隔離SQLiteで検索・画面操作を検証するコマンド（共有テストDBを再作成するconftestは読み込みません）:
+
+```bash
+DATABASE_URL=sqlite:///:memory: python -m pytest --noconftest -p no:cacheprovider -o addopts= tests/unit/test_search_service.py tests/unit/test_unified_search_ui.py -q
+```
+
+### 2. モバイルUI（スマートフォン・タブレット）
+```bash
+streamlit run app_mobile.py
+# LAN内のモバイル実機からは http://<PCのIP>:8501 にアクセス
+```
+
+- 4タブ構成（検索／マイ検索／お知らせ／設定）のシングルカラム・レスポンシブUIです。サイドバーは使わず、上部タブで画面を切り替えます。
+- 検索タブ: キーワード（AND検索）・都道府県複数選択・発注機関・公開日範囲で縦積みフォームから検索します。結果はカード形式で20件ずつ表示し、「もっと見る」で追加取得します（重複なし）。
+- マイ検索タブ: ログイン後に検索条件を保存・読込・編集・削除できます（所有者別に分離、既存の配信処理には影響しません）。
+- お知らせタブ: 通知の本文・送信履歴・既読状態を保存する仕組みが未実装のため、履歴表示はできません（明示的に案内表示）。
+- 設定タブ: メール／LINE通知のオン・オフ（保存先は `notification_channels`）、プラン情報（次回請求日はStripeポータル参照）、直近7日間の再取得ジョブ投入と状態表示が行えます。
+- 通信エラー時は最後に成功した検索結果をキャッシュ表示し、「古いデータです」バナーと5分経過後の更新案内を出します。
+- `static/css/mobile.css` で48px以上のタップ領域・ダークモード（OS設定追従）・横向き対応を適用します。実機確認の手順は下記の通りです。
+
+実機確認チェックリスト（Android/iOS またはエミュレータ）:
+
+1. `streamlit run app_mobile.py --server.address 0.0.0.0` で起動し、同一LANのスマートフォンから開く
+2. タップ操作（ボタンが48px以上で重ならない、ズーム不要）を確認
+3. 縦横回転でレイアウト崩れがないか確認
+4. 機内モード等で通信を遮断し、「古いデータです」バナーとエラー表示を確認
+5. ログイン・保存検索・設定保存がモバイル画面で完結するか確認
+6. 請求関連はデスクトップの「プラン・請求」ページを案内する仕様です（StripeポータルへはPCから）
+
+単体テスト:
+
+```bash
+python -m unittest tests.unit.test_mobile_ui tests.unit.test_mobile_ui_service -v
+```
+
+### 3. 分析ダッシュボード（KPI・競合・品質）
 ```bash
 streamlit run app_dashboard.py
 ```
-### 3. 管理画面（Flask）
+### 落札情報検索ビュー
+```bash
+streamlit run app_award_search.py
+```
+
+- 落札会社名・参加会社名（部分一致、正規化名で検索）、案件名、発注機関、業種カテゴリ、都道府県、落札日付範囲（既定は過去90日）で絞り込みます。
+- 参加会社名は `AwardHistory` + `Competitor`（`normalized_name`）の突合で判定します。履歴がない案件は「（記録なし）」と表示されます。
+- サイドバーに勝率（参加回数・落札回数・勝率）、結果下部に月別落札件数の棒グラフ、CSVダウンロード（現在ページ）とページネーション（50件/頁）を提供します。
+- 入札方式は `AwardResult` に保存項目がないため未対応です（`category` は業種区分）。
+- 関連サービスは `services/award_search_service.py`、単体テストは `tests/unit/test_award_search.py` を参照してください。
+### 4. 管理画面（Flask）
 ```bash
 python app_admin.py
 # http://localhost:5000 にアクセス
 ```
-### 4. 課金・プラン管理 UI
+### 5. 課金・プラン管理 UI
 ```bash
 streamlit run app_billing.py
 # 認証後、サイドバーの「💳 プラン・請求」からもアクセス可能
 ```
-### 5. Stripe Webhook エンドポイント
+### 6. Stripe Webhook エンドポイント
 ```bash
 # 別ターミナルで実行（開発時）
 uvicorn app_webhook:app --host 0.0.0.0 --port 8000
 ```
-### 6. 自動巡回クローラ（全自治体取得）
+### 7. 自動巡回クローラ（全自治体取得）
 ```bash
 python main.py   # 設定された CrawlConfig に従い HTML / PDF を取得し DB に保存
 ```
-### 7. スケジューラ（バックグラウンドジョブ）
+### 8. スケジューラ（バックグラウンドジョブ）
 ```bash
 python - <<'PY'
 from scheduler import scheduler_manager
@@ -156,7 +220,7 @@ PY
 > - 朝のダイジェスト通知（毎日 08:00）
 > - バックフィルジョブ（週1回、日曜深夜）
 >
-### 8. 品質メトリクス収集・評価（手動実行例）
+### 9. 品質メトリクス収集・評価（手動実行例）
 ```bash
 # メトリクス収集
 python scripts/collect_quality_metrics.py
@@ -165,7 +229,7 @@ python scripts/collect_quality_metrics.py
 python scripts/evaluate_quality_alerts.py
 ```
 
-### 9. GEPSライブテスト実行（本番環境検証）
+### 10. GEPSライブテスト実行（本番環境検証）
 ```bash
 # 基本実行（全テスト、デフォルトパス使用）
 python tests/test_geps_live/scripts/run_live_tests.py
@@ -332,6 +396,14 @@ python tests/test_geps_live/scripts/run_live_tests.py --phase 1-10 --xdist auto 
 │   └─ ...                    # その他のユーティリティスクリプト
 ├─ search_api/               # 検索APIマイクロサービス
 │   ├─ main.py                # エントリーポイント
+│   ├─ Dockerfile             # API 用 Dockerfile
+│   ├─ schemas.py             # Pydantic スキーマ
+│   ├─ bid_api.py             # 入札エンドポイント
+│   ├─ award_api.py           # 落札結果エンドポイント
+│   ├─ forecast_api.py        # 発注予測エンドポイント
+│   ├─ quality_api.py         # 品質メトリクスエンドポイント
+│   ├─ user_api.py            # 保存検索・アラートエンドポイント
+│   ├─ metrics_api.py         # パイプラインメトリクスエンドポイント
 │   └─ qualification_api.py   # 資格認証API
 ├─ static/css/custom_dashboard.css   # ダッシュボード用カスタムテーマ
 ├─ tests/                    # テスト群

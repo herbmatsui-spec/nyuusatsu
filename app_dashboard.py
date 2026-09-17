@@ -13,6 +13,7 @@ import pandas as pd
 import json
 import os
 from datetime import date, timedelta, datetime
+from pathlib import Path
 from dotenv import load_dotenv
 
 from database.engine import get_session
@@ -82,7 +83,7 @@ with st.sidebar:
 
 # Initialize DB connection
 try:
-    db = next(get_session())
+    db = get_session()
     bid_repo = BidRepository(db)
     favorite_repo = FavoriteRepository(db)
     bid_service = BidService(bid_repo, favorite_repo)
@@ -191,6 +192,7 @@ elif menu == "🔍 検索":
     # Plan gate for search
     user = get_current_user() if is_authenticated() else None
     limits = get_user_limits(user) if user else PlanConfig.LIMITS[PlanConfig.FREE]
+    user_id = st.session_state.get("user_id", "default")
 
     # 全案件からユニークな発注機関を取得してプルダウンに設定
     all_bids = bid_service.get_all_bids()
@@ -240,6 +242,21 @@ elif menu == "🔍 検索":
             st.download_button("💾 CSVエクスポート", data=csv, file_name="search_results.csv", mime="text/csv")
         elif results and not limits["export"]:
             st.caption("🔒 CSV/JSONエクスポートはスタンダードプラン以上で利用可能です")
+
+    # 保存検索ボタン
+    saved_service = SavedSearchService(db)
+    if st.button("この検索条件を保存"):
+        st.session_state.show_save_search_input = True
+
+    if st.session_state.get("show_save_search_input", False):
+        with st.form("save_search_form"):
+            s_name = st.text_input("検索名", key="save_search_name")
+            save_submitted = st.form_submit_button("保存")
+            if save_submitted and s_name:
+                saved_service.create(user_id=user_id, name=s_name, criteria=filters)
+                st.success("検索条件を保存しました。")
+                st.session_state.show_save_search_input = False
+                st.rerun()
 
 
 elif menu == "💰 コスト":
@@ -326,6 +343,10 @@ elif menu == "🔔 アラート履歴":
     render_alert_history_page()
 elif menu == "🏢 競合分析":
     from services.competitor_dashboard_page import render_competitor_page
+    guide_path = Path(__file__).resolve().parent / "docs" / "competitive_analysis_guide.md"
+    if guide_path.exists():
+        guide_path = guide_path.relative_to(Path(__file__).resolve().parent)
+        st.page_link(str(guide_path), label="📖 使い方ガイド", icon="📖")
     render_competitor_page()
 elif menu == "🛠 データ品質":
     st.title("🛠 データ品質")

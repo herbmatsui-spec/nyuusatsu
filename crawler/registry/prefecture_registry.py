@@ -2,7 +2,7 @@
 
 ``data/prefecture_urls.csv`` から都道府県の base_url / bid_url_pattern を
 読み込み、``RegistryRecord`` として返す。CSV 列:
-  municipality_code, name, base_url, bid_url_pattern, bid_system, parser_type
+  municipality_code, name, base_url, bid_url_pattern, bid_system, parser_type, parent_id
 """
 from __future__ import annotations
 
@@ -37,4 +37,5 @@ class PrefectureRegistry(BaseRegistry):
                 type="prefecture",
                 region=(row.get("name") or "").strip(),
                 parser_type=(row.get("parser_type") or "generic").strip() or "generic",
+                parent_id=(row.get("parent_id") or "").strip(),
             )

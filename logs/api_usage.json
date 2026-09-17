@@ -12,5 +12,19 @@
         "requests": 2
       }
     }
+  },
+  {
+    "date": "2026-09-17",
+    "total_prompt_tokens": 0,
+    "total_completion_tokens": 0,
+    "total_requests": 3,
+    "providers": {
+      "mock": {
+        "model": "unknown",
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "requests": 3
+      }
+    }
   }
 ]

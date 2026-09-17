@@ -1,6 +1,6 @@
 import pytest
 import os
-import json
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 from database.models import Bid, Customer, Partner, CustomerBidLink, PartnerBidLink
 from services.bid_analysis_service import BidAnalysisService
@@ -24,9 +24,10 @@ def test_extract_text_from_pdf(mocker):
     assert "テスト用の入札仕様書" in text
 
 def test_analyze_and_save_flow(db_session, mocker):
-    # テスト用の Customer と Partner を挿入
-    customer = Customer(name="株式会社テストクライアント", company="テストクライアント", memo="AI, 開発, クラウド")
-    partner = Partner(name="パートナー開発会社", category="システム開発", memo="システム開発, 保守")
+    # テスト用の Customer と Partner を挿入（必須カラムを設定）
+    now = datetime.now(timezone.utc)
+    customer = Customer(name="株式会社テストクライアント", company="テストクライアント", memo="AI, 開発, クラウド", created_at=now, updated_at=now)
+    partner = Partner(name="パートナー開発会社", category="システム開発", memo="システム開発, 保守", created_at=now, updated_at=now)
     db_session.add_all([customer, partner])
     db_session.commit()
 
@@ -43,7 +44,7 @@ def test_analyze_and_save_flow(db_session, mocker):
     mock_llm_result = {
         "budget": "1,500万円",
         "qualifications": ["全省庁統一資格 A等級またはB等級", "システム開発の実績"],
-        "deadline": "2026年12月末",
+        "deadline": "2026-12-31",
         "deliverables": "AIシステム開発ソースコードおよびドキュメント一式",
         "key_risks": ["開発スケジュールの遅延リスク"],
         "industry_category": "システム開発",
@@ -66,13 +67,16 @@ def test_analyze_and_save_flow(db_session, mocker):
     assert bid.filename == "dummy_spec.pdf"
     assert bid.budget == "1,500万円"
     assert bid.budget_amount == 15000000  # parse_budgetの確認
-    assert bid.deadline == "2026年12月末"
+    assert bid.deadline == "2026-12-31"
     assert bid.deliverables == "AIシステム開発ソースコードおよびドキュメント一式"
 
-    
-    # qualifications/key_risks がJSON文字列であることを確認
-    quals = json.loads(bid.qualifications)
-    assert "全省庁統一資格 A等級またはB等級" in quals
+    # 正規化済みフィールドの確認
+    # qualifications はリスト→正規化テキスト（改行結合）として保存される
+    assert "全省庁統一資格 A等級またはB等級" in bid.qualifications
+    assert "システム開発の実績" in bid.qualifications
+    # deadline が日付型として delivery_deadline に保存される
+    from datetime import date
+    assert bid.delivery_deadline == date(2026, 12, 31)
     
     # マッチングリンクが正しく作成されているか確認
     # Customer: memoに「AI」「開発」があり、bidのdeliverablesに「AIシステム開発」が含まれるためマッチするはず

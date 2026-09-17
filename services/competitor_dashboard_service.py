@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from database.models import (
@@ -32,7 +32,7 @@ class CompetitorDashboardService:
                 Competitor.is_target_company,
                 func.count(AwardHistory.id).label("total_bids"),
                 func.sum(
-                    func.case((AwardHistory.is_winner == True, 1), else_=0)
+                    case((AwardHistory.is_winner.is_(True), 1), else_=0)
                 ).label("wins"),
                 func.avg(AwardResult.award_rate).label("avg_award_rate"),
                 func.max(AwardResult.award_date).label("latest_award"),

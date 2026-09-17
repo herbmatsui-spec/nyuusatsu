@@ -1,5 +1,5 @@
 """Auto-generated SQLAlchemy models from bids_system.db + bids.db schema."""
-from sqlalchemy import Column, Integer, String, Text, Float, LargeBinary, Boolean, DateTime, Numeric, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Text, Float, LargeBinary, Boolean, DateTime, Numeric, ForeignKey, Enum as SQLEnum, Date
 from sqlalchemy.orm import declarative_base, relationship
 import enum
 from datetime import datetime
@@ -19,6 +19,9 @@ class Agency(Base):
     category_id = Column(Integer, ForeignKey('agency_categories.id'))
     priority_level = Column(Integer, )
     system_type = Column(Text, )
+    parent_id = Column(Integer, ForeignKey('agencies.id', name='fk_agencies_parent_id'), nullable=True, index=True)
+    parent = relationship("Agency", remote_side=[id], back_populates="children")
+    children = relationship("Agency", back_populates="parent")
     backfill_jobs = relationship("BackfillJob", back_populates="agency")
 
 
@@ -160,6 +163,7 @@ class Bid(Base):
     current_status = Column(String, nullable=False)
     industry_category = Column(String, )
     organization_name = Column(String, )
+    bid_type = Column(String, nullable=True)
     actual_bid_amount = Column(Integer, )
     win_loss_reason = Column(Text, )
     created_at = Column(DateTime, nullable=False)
@@ -171,6 +175,11 @@ class Bid(Base):
     prefecture_code = Column(String, )
     announcement_date = Column(DateTime, )
     updated_date = Column(DateTime, )
+    delivery_deadline = Column(Date, )
+    specification_text = Column(Text, )
+    specification_text_clean = Column(Text, )
+    bid_difficulty_score = Column(Float, )
+    win_prediction_score = Column(Float, )
 
 class CompanyProfile(Base):
     __tablename__ = 'company_profiles'
@@ -481,7 +490,7 @@ class Role(Base):
 class SavedSearch(Base):
     __tablename__ = 'saved_searches'
     id = Column(Integer, primary_key=True)
-    user_id = Column(String, )
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     name = Column(String, nullable=False)
     criteria_json = Column(Text, nullable=False)
     last_notified_at = Column(DateTime, )
@@ -513,6 +522,9 @@ class UrlRegistry(Base):
     parser_type = Column(String, nullable=False)
     max_depth = Column(Integer, nullable=False)
     last_crawled_at = Column(String, )
+    parent_id = Column(Integer, ForeignKey('url_registry.id', name='fk_url_registry_parent_id'), nullable=True, index=True)
+    parent = relationship("UrlRegistry", remote_side=[id], back_populates="children")
+    children = relationship("UrlRegistry", back_populates="parent")
 
 class UserRole(Base):
     __tablename__ = 'user_roles'
@@ -537,6 +549,7 @@ class User(Base):
     trial_ends_at = Column(DateTime, nullable=True)
     subscription_status = Column(String(20), default='inactive', nullable=False)
     current_period_end = Column(DateTime, nullable=True)
+    allowed_prefectures = Column(Text, nullable=True)
 
 
 class BackfillJobStatus(str, enum.Enum):

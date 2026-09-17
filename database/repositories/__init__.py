@@ -4,7 +4,7 @@ NOTE: These are reconstructed thin wrappers over the generated models. The exact
 method surface of the original package is not fully known; add project-specific
 query methods here as call sites require them.
 """
-from datetime import date
+from datetime import date, datetime
 from ..models import AwardResult as _AwardResult
 from ..models import Bid as _Bid
 from ..models import Agency as _Agency
@@ -25,6 +25,7 @@ from ..models import CrawlHistory as _CrawlHistory
 from ..models import SystemSetting as _Setting
 from ..models import AgencyInventory as _AgencyInventory
 from ..models import Prefecture as _Prefecture
+from typing import Optional
 from .base import BaseRepository
 
 
@@ -56,6 +57,55 @@ class BidRepository(BaseRepository):
         if limit:
             query = query.limit(limit)
         return query.all()
+
+    def search(
+        self,
+        keyword: Optional[str] = None,
+        prefecture: Optional[str] = None,
+        prefecture_codes: Optional[list] = None,
+        organization: Optional[str] = None,
+        budget_min: Optional[int] = None,
+        budget_max: Optional[int] = None,
+        published_after: Optional[datetime] = None,
+        published_before: Optional[datetime] = None,
+        offset: int = 0,
+        limit: int = 20,
+    ):
+        """Search bids with optional filters and pagination.
+
+        Returns a tuple of (results: list[Bid], total: int).
+        prefecture_codes is an exact allow-list: [] yields no rows, None is unrestricted.
+        """
+        from sqlalchemy import or_
+        query = self.session.query(self.model)
+        if keyword:
+            kw = f"%{keyword}%"
+            query = query.filter(
+                or_(
+                    self.model.filename.ilike(kw),
+                    self.model.organization_name.ilike(kw),
+                    self.model.notes.ilike(kw),
+                )
+            )
+        if prefecture_codes is not None:
+            if not prefecture_codes:
+                return [], 0
+            query = query.filter(self.model.prefecture_code.in_(prefecture_codes))
+        if prefecture:
+            query = query.filter(self.model.prefecture_code == prefecture)
+        if organization:
+            query = query.filter(self.model.organization_name.ilike(f"%{organization}%"))
+        if budget_min is not None:
+            query = query.filter(self.model.budget_amount >= budget_min)
+        if budget_max is not None:
+            query = query.filter(self.model.budget_amount <= budget_max)
+        if published_after is not None:
+            query = query.filter(self.model.announcement_date >= published_after)
+        if published_before is not None:
+            query = query.filter(self.model.announcement_date <= published_before)
+        total = query.count()
+        results = query.order_by(self.model.announcement_date.desc()).offset(offset).limit(limit).all()
+        return results, total
 
     def upsert_bid(self, bid_data: dict):
         data = dict(bid_data)
@@ -147,9 +197,14 @@ class PartnerRepository(BaseRepository):
 class SavedSearchRepository(BaseRepository):
     model = _SavedSearch
 
-    def get_active_by_user(self, user_id: str):
+    def get_active_by_user(self, user_id: int):
         return self.session.query(self.model).filter(
             self.model.user_id == user_id,
+            self.model.is_active == True
+        ).all()
+
+    def get_all_active(self):
+        return self.session.query(self.model).filter(
             self.model.is_active == True
         ).all()
 
@@ -170,6 +225,52 @@ class FavoriteRepository(BaseRepository):
 
 class AwardResultRepository(BaseRepository):
     model = _AwardResult
+
+    def search(
+        self,
+        keyword: Optional[str] = None,
+        winner_name: Optional[str] = None,
+        agency_name: Optional[str] = None,
+        budget_min: Optional[int] = None,
+        budget_max: Optional[int] = None,
+        awarded_after: Optional[datetime] = None,
+        awarded_before: Optional[datetime] = None,
+        bid_id: Optional[int] = None,
+        offset: int = 0,
+        limit: int = 20,
+    ):
+        """Search award results with optional filters and pagination.
+
+        Returns a tuple of (results: list[AwardResult], total: int).
+        """
+        from sqlalchemy import or_
+        query = self.session.query(self.model)
+        if keyword:
+            kw = f"%{keyword}%"
+            query = query.filter(
+                or_(
+                    self.model.project_name.ilike(kw),
+                    self.model.agency_name.ilike(kw),
+                    self.model.winner_name.ilike(kw),
+                )
+            )
+        if winner_name:
+            query = query.filter(self.model.winner_name.ilike(f"%{winner_name}%"))
+        if agency_name:
+            query = query.filter(self.model.agency_name.ilike(f"%{agency_name}%"))
+        if budget_min is not None:
+            query = query.filter(self.model.budget_amount >= budget_min)
+        if budget_max is not None:
+            query = query.filter(self.model.budget_amount <= budget_max)
+        if awarded_after is not None:
+            query = query.filter(self.model.award_date >= awarded_after)
+        if awarded_before is not None:
+            query = query.filter(self.model.award_date <= awarded_before)
+        if bid_id is not None:
+            query = query.filter(self.model.tender_id == bid_id)
+        total = query.count()
+        results = query.order_by(self.model.award_date.desc()).offset(offset).limit(limit).all()
+        return results, total
 
 
 class CrawlHistoryRepository(BaseRepository):

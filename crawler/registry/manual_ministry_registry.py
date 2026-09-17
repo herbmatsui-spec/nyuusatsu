@@ -3,7 +3,7 @@
 ``data/manual_ministry_domains.csv`` から省庁の base_url を読み込み、
 bid_url_pattern は GEPS 検索 URL をフォールバックとして生成して
 ``RegistryRecord`` として返す。CSV 列:
-  agency_name, base_url, note
+  agency_name, base_url, note, parent_id, bid_url_pattern
 """
 from __future__ import annotations
 
@@ -32,14 +32,14 @@ class ManualMinistryRegistry(BaseRegistry):
     def iter_records(self) -> Iterator[RegistryRecord]:
         rows = self._read_csv(self.csv_path)
         for row in rows:
-            agency_name = (row.get("agency_name") or "").strip()
+            agency_name = (row.get("agency_name") or row.get("name") or "").strip()
             base_url = (row.get("base_url") or "").strip()
             note = (row.get("note") or "").strip()
             bid_url_pattern = (row.get("bid_url_pattern") or "").strip()
             if not bid_url_pattern:
                 bid_url_pattern = self.geps_url(agency_name)
             yield RegistryRecord(
-                municipality_code="",  # ministries have no municipality code
+                municipality_code=(row.get("municipality_code") or "").strip(),
                 name=agency_name,
                 base_url=base_url,
                 bid_url_pattern=bid_url_pattern,
@@ -48,5 +48,6 @@ class ManualMinistryRegistry(BaseRegistry):
                 type="ministry",
                 region="",
                 parser_type="generic",
+                parent_id=(row.get("parent_id") or "").strip(),
                 extra={"note": note} if note else {},
             )

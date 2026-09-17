@@ -310,6 +310,15 @@ def test_collect_all_metrics(mock_session):
     service.daily_delta = MagicMock(return_value={"new": 100, "updated": 50})
     service.geps_crawler_success_rate = MagicMock(return_value=95.0)
     service.geps_selector_match_rate = MagicMock(return_value=98.0)
+    service.collect_llm_extraction_quality = MagicMock(return_value={
+        "llm_sample_count": 100.0,
+        "llm_missing_budget_amount_rate": 10.0,
+        "llm_missing_qualifications_rate": 5.0,
+        "llm_missing_delivery_deadline_rate": 30.0,
+        "llm_missing_deliverables_rate": 5.0,
+        "llm_budget_anomaly_count": 1.0,
+        "llm_budget_anomaly_rate": 1.0,
+    })
 
     result = service.collect_all_metrics()
 
@@ -326,6 +335,13 @@ def test_collect_all_metrics(mock_session):
         "duplicate_count": 20,
         "daily_new": 100,
         "daily_updated": 50,
+        "llm_sample_count": 100.0,
+        "llm_missing_budget_amount_rate": 10.0,
+        "llm_missing_qualifications_rate": 5.0,
+        "llm_missing_delivery_deadline_rate": 30.0,
+        "llm_missing_deliverables_rate": 5.0,
+        "llm_budget_anomaly_count": 1.0,
+        "llm_budget_anomaly_rate": 1.0,
     }
     assert result == expected
 
